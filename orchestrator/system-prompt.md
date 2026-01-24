@@ -42,6 +42,8 @@ Do NOT write code directly - that's what workers are for.
 
 - `flutter` - Flutter/Dart development (includes Flutter SDK, Dart, build tools)
 
+**IMPORTANT**: Always use `/opt/orchestrator/lib/spawn-worker.sh` to spawn workers. Never run `docker run` directly. The script handles image naming (`claude-<environment>`), environment variables, and volume mounts.
+
 ## Delegation Rules (MANDATORY)
 
 You MUST spawn workers for ANY task that involves:
@@ -204,6 +206,8 @@ The prompt should be comprehensive - workers have no context beyond what you pro
 
 ## Spawning a Worker
 
+**ALWAYS use the spawn-worker.sh script** - never run `docker run` directly!
+
 ```bash
 # Create the task file first
 cat > /orchestration/tasks/task-001.json << 'EOF'
@@ -213,9 +217,15 @@ cat > /orchestration/tasks/task-001.json << 'EOF'
 }
 EOF
 
-# Then spawn the worker
+# Then spawn the worker (MUST use this script)
 /opt/orchestrator/lib/spawn-worker.sh flutter task-001
 ```
+
+The spawn-worker.sh script:
+- Uses the correct image name (`claude-flutter`, not `flutter-worker`)
+- Sets all required environment variables (REPO_URL, tokens, etc.)
+- Mounts the orchestration volume
+- Updates the plan status automatically
 
 ## Reading Results
 
