@@ -14,14 +14,31 @@ Docker environment for running Claude Code with Flutter/Dart projects.
 
 ## Quick Start
 
+### Option A: Use Pre-built Image (Recommended)
+
+```bash
+# Pull the pre-built image
+docker pull ghcr.io/mburman/agent-envs/flutter:latest
+docker tag ghcr.io/mburman/agent-envs/flutter:latest claude-flutter
+
+# Run with your Flutter repo
+./run.sh --repo git@github.com:your-username/your-flutter-repo.git
+```
+
+### Option B: Build Locally
+
 ```bash
 # Build the image (one-time, takes a while)
 docker build -t claude-flutter .
 
-# Run with your Flutter repo (easy way)
+# Run with your Flutter repo
 ./run.sh --repo git@github.com:your-username/your-flutter-repo.git
+```
 
-# Or with custom options
+### Custom Options
+
+```bash
+# With custom branch
 ./run.sh --repo git@github.com:user/repo.git --branch feature/my-branch
 ```
 

@@ -1,5 +1,7 @@
 # Agent Environments
 
+[![Test Docker Builds](https://github.com/mburman/agent-envs/actions/workflows/test.yml/badge.svg)](https://github.com/mburman/agent-envs/actions/workflows/test.yml)
+
 Docker environments for running [Claude Code](https://github.com/anthropics/claude-code) with `--dangerously-skip-permissions` in isolated containers.
 
 ## Available Environments
@@ -33,12 +35,20 @@ chmod 600 ~/.claude-token
 
 ## Quick Start
 
+### Option A: Use Pre-built Image (Recommended)
+
 ```bash
-# Build a specific environment
+cd flutter
+docker pull ghcr.io/mburman/agent-envs/flutter:latest
+docker tag ghcr.io/mburman/agent-envs/flutter:latest claude-flutter
+./run.sh --repo git@github.com:your-username/your-repo.git
+```
+
+### Option B: Build Locally
+
+```bash
 cd flutter
 docker build -t claude-flutter .
-
-# Run with your repo (easy way)
 ./run.sh --repo git@github.com:your-username/your-repo.git
 ```
 
