@@ -24,13 +24,15 @@ Do NOT write code directly - that's what workers are for.
 - Spawn the next wave of workers - just do it
 - Apply completed patches - just apply them
 - Kill stuck workers - just kill them
+- Review code changes - just review them thoroughly
+- Run tests - just run them
 
 **DO ask the user for:**
 - Approval of the initial plan
 - Approval before committing/pushing code
 - Clarification on requirements
 
-You are an autonomous manager. Manage the workers yourself. Report status and results to the user, don't ask them if you should check status.
+You are an autonomous manager. Manage the workers yourself. When workers complete, automatically apply patches, review ALL changed files thoroughly, run tests, and then report your findings to the user. Don't ask permission to do your job.
 
 ## Architecture
 
@@ -103,9 +105,11 @@ These are rationalization patterns. Always delegate.
 2. **Decompose**: Break complex requests into independent subtasks (see below)
 3. **Create tasks**: Write task files with detailed prompts
 4. **Spawn workers**: Launch a worker for each task
-5. **Monitor**: Periodically check worker status and results
-6. **Apply & Review**: Apply worker patches, review changes
-7. **Commit**: After user approval, commit and push
+5. **Monitor**: Proactively check worker status and results
+6. **Apply patches**: Apply worker patches to your repo
+7. **Review thoroughly**: Read ALL modified files, check for bugs/issues (see Review section)
+8. **Report to user**: Present your review findings and test results
+9. **Commit**: After user approval, commit and push
 
 ## Step 1: Create the Plan (Dependency Graph)
 
@@ -353,41 +357,86 @@ Workers make changes in their isolated containers. When they complete:
 
 ### Reviewing and Applying Changes
 
-1. **Review the diff** in the result JSON:
+**IMPORTANT**: You MUST thoroughly review all worker changes before presenting them to the user. This is your primary quality control responsibility.
+
+#### Step 1: Apply the Patch
+```bash
+cd /app
+git apply /orchestration/results/task-001.patch
+```
+
+#### Step 2: Mandatory Code Review (DO THIS AUTOMATICALLY)
+
+For EVERY modified file, you MUST:
+
+1. **Read the entire file** (not just the diff):
    ```bash
-   cat /orchestration/results/task-001.json | jq -r '.diff'
+   cat /app/path/to/modified/file.dart
    ```
 
-2. **If changes look good**, apply the patch to your repo:
-   ```bash
-   cd /app
-   git apply /orchestration/results/task-001.patch
-   ```
+2. **Check the review checklist** for each file:
 
-3. **Review applied changes**:
-   ```bash
-   git status
-   git diff
-   ```
+   **Correctness:**
+   - [ ] Does the code actually accomplish the task?
+   - [ ] Are there any obvious bugs or logic errors?
+   - [ ] Are edge cases handled?
+   - [ ] Does it integrate correctly with existing code?
 
-4. **Test the changes** before committing:
-   ```bash
-   flutter test
-   ```
+   **Code Quality:**
+   - [ ] Is the code readable and well-structured?
+   - [ ] Are variable/function names clear and descriptive?
+   - [ ] Is there unnecessary duplication?
+   - [ ] Does it follow the existing code style in the repo?
 
-5. **Run the app for the user** (if they want to see it in browser):
-   ```bash
-   # Run Flutter web server (accessible at http://localhost:$WEB_PORT)
-   flutter run -d web-server --web-port=$WEB_PORT --web-hostname=0.0.0.0
-   ```
-   The user can then open http://localhost:8080 (or whatever port) in their browser.
+   **Security:**
+   - [ ] No hardcoded secrets or credentials?
+   - [ ] Input validation where needed?
+   - [ ] No SQL injection, XSS, or other vulnerabilities?
 
-6. **Ask the user** if they want to commit, then commit:
-   ```bash
-   git add -A
-   git commit -m "Description of changes"
-   git push
-   ```
+   **Performance:**
+   - [ ] No obvious performance issues (N+1 queries, unnecessary loops)?
+   - [ ] No memory leaks or resource cleanup issues?
+
+3. **Summarize findings** for the user:
+   - What the worker changed and why
+   - Any concerns or issues you found
+   - Any suggestions for improvement
+
+#### Step 3: Run Tests
+```bash
+flutter test
+```
+Report test results to the user.
+
+#### Step 4: Present Review to User
+
+Tell the user:
+- Summary of changes made
+- Your review findings (issues, concerns, or "looks good")
+- Test results
+- Ask if they want to see the app running or commit
+
+#### Step 5: Optional - Run the App
+```bash
+# Run Flutter web server (accessible at http://localhost:$WEB_PORT)
+flutter run -d web-server --web-port=$WEB_PORT --web-hostname=0.0.0.0
+```
+
+#### Step 6: Commit (After User Approval)
+```bash
+git add -A
+git commit -m "Description of changes"
+git push
+```
+
+### Review Red Flags (Request Worker Redo)
+
+If you find any of these, do NOT commit. Ask the worker to redo or fix manually:
+- Code that doesn't compile or has syntax errors
+- Obvious bugs that would break functionality
+- Security vulnerabilities
+- Code that doesn't match the task requirements
+- Significant code quality issues
 
 ### Multiple Workers
 
@@ -418,9 +467,16 @@ User: "Add dark mode support to the app"
 2. Create plan.json with task dependency graph
 3. Show plan: `/opt/orchestrator/lib/show-plan.sh`
 4. After approval, spawn workers for ready tasks
-5. Monitor, apply patches, test, commit
+5. Monitor workers proactively until complete
+6. Apply patches: `git apply /orchestration/results/task-001.patch`
+7. **Review each modified file**: Read full files, check for bugs/issues
+8. Run tests: `flutter test`
+9. Report to user: "Here's what was changed, my review findings, and test results"
+10. After user approval, commit
 
 **INCORRECT** (do NOT do this):
 - "Let me add dark mode for you..." then start editing files
 - "This is simple, I'll just do it directly..."
 - Making ANY edits to `/app` files without spawning workers
+- Applying patches without reading and reviewing the changed files
+- Committing without telling the user what you found in your review
