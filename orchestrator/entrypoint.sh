@@ -100,10 +100,11 @@ save_session() {
     mkdir -p "$SESSION_PATH"
     cp -r ~/.claude "$SESSION_PATH/" 2>/dev/null || true
     # Save the most recent session ID for resume
-    # Claude stores sessions in ~/.claude/projects/<path>/sessions/
-    LATEST_SESSION=$(find ~/.claude -name "*.json" -path "*/sessions/*" -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/\.json$//' || echo "")
+    # Claude stores sessions as .jsonl files in ~/.claude/projects/<path>/<session-id>.jsonl
+    LATEST_SESSION=$(find ~/.claude/projects -name "*.jsonl" -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/\.jsonl$//' || echo "")
     if [ -n "$LATEST_SESSION" ]; then
       echo "$LATEST_SESSION" > "$SESSION_PATH/session-id"
+      echo "Session ID: $LATEST_SESSION"
     fi
     echo "Session saved."
   fi
