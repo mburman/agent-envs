@@ -80,7 +80,9 @@ COPY orchestrator/entrypoint.sh /entrypoint.sh
 COPY orchestrator/system-prompt.md /opt/orchestrator/system-prompt.md
 COPY orchestrator/lib/ /opt/orchestrator/lib/
 COPY lib/worktree/ /opt/orchestrator/lib/worktree/
-RUN chmod +x /entrypoint.sh /opt/orchestrator/lib/*.sh /opt/orchestrator/lib/worktree/*.sh
+COPY .claude/agents/ /home/dev/.claude/agents/
+RUN chmod +x /entrypoint.sh /opt/orchestrator/lib/*.sh /opt/orchestrator/lib/worktree/*.sh \
+    && chown -R dev:dev /home/dev/.claude/agents
 
 WORKDIR /app
 
