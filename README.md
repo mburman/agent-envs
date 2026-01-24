@@ -8,7 +8,26 @@ Docker environments for running [Claude Code](https://github.com/anthropics/clau
 
 | Environment | Description |
 |-------------|-------------|
-| [flutter/](./flutter/) | Flutter + Dart with monorepo support (auto-detects nested packages) |
+| [orchestrator/](./orchestrator/) | **Manager agent** - coordinates workers, has Flutter + Docker CLI |
+| [flutter/](./flutter/) | **Worker agent** - Flutter + Dart with monorepo support |
+
+## Quick Start (Orchestration)
+
+The orchestration system lets a Manager agent spawn and coordinate Worker agents:
+
+```bash
+# Build all images
+./build.sh
+
+# Start the Manager
+./run.sh --repo git@github.com:your-user/your-flutter-app.git
+
+# Talk to the Manager naturally
+You: "Add dark mode support to the app"
+Manager: [Creates plan, spawns workers, monitors progress, applies patches]
+```
+
+See [orchestrator/README.md](./orchestrator/README.md) for full documentation.
 
 ## Why?
 

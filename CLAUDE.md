@@ -6,12 +6,58 @@ This repo contains Docker environments for running Claude Code with `--dangerous
 
 ```
 agent-envs/
-├── README.md           # Overview and quick start
-├── CLAUDE.md           # This file
-└── flutter/            # Flutter/Dart environment
-    ├── Dockerfile      # Ubuntu 22.04 + Flutter SDK + Node.js + Claude Code
-    ├── entrypoint.sh   # Clones repo, installs deps, starts Claude
+├── README.md              # Overview and quick start
+├── CLAUDE.md              # This file
+├── build.sh               # Build all images
+├── run.sh                 # Start the Manager
+├── test.sh                # Run tests
+├── orchestrator/          # Manager agent environment
+│   ├── Dockerfile         # Ubuntu + Flutter + Docker CLI + Claude Code
+│   ├── entrypoint.sh      # Clones repo, starts Claude with system prompt
+│   ├── system-prompt.md   # Manager orchestration instructions
+│   ├── README.md
+│   └── lib/               # Orchestration scripts
+│       ├── spawn-worker.sh
+│       ├── show-plan.sh
+│       ├── get-ready-tasks.sh
+│       ├── update-task-status.sh
+│       ├── list-workers.sh
+│       └── cleanup.sh
+└── flutter/               # Worker agent environment
+    ├── Dockerfile         # Ubuntu + Flutter SDK + Node.js + Claude Code
+    ├── entrypoint.sh      # Clones repo, supports worker mode
     └── README.md
+```
+
+## Orchestration System
+
+The orchestration system enables a Manager agent to coordinate multiple Worker agents:
+
+**Manager** (`orchestrator/`):
+- Interactive Claude Code session you talk to directly
+- Has Flutter, Docker CLI, and all dev tools
+- Creates dependency graphs of tasks
+- Spawns workers for parallel execution
+- Applies worker patches and commits (quality control)
+- Can run `flutter test` and `flutter run` for verification
+
+**Workers** (`flutter/` in worker mode):
+- Headless Claude Code instances (`claude -p`)
+- Clone repo fresh, execute one task, exit
+- Cannot commit or push (git hooks block it)
+- Generate patches for Manager to review/apply
+
+**Communication**:
+- Shared Docker volume at `/orchestration`
+- `plan.json` - Dependency graph with task status
+- `tasks/*.json` - Task definitions with prompts
+- `results/*.json` and `*.patch` - Worker output
+
+**Usage**:
+```bash
+./build.sh                                    # Build images
+./run.sh --repo git@github.com:user/app.git   # Start Manager
+./test.sh                                     # Run tests
 ```
 
 ## Flutter Environment
@@ -100,14 +146,19 @@ Tokens from `claude setup-token` have limited scopes (`user:inference` only). Fe
 ## Testing
 
 ```bash
-# Build an environment
-cd flutter
-docker build -t claude-flutter .
+# Run the full test suite
+./test.sh
 
-# Test it
-docker run -it --rm \
-  -e REPO_URL="git@github.com:user/test-repo.git" \
-  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token | tr -d '\n')" \
-  -v ~/.ssh/id_ed25519:/home/dev/.ssh/id_ed25519:ro \
-  claude-flutter
+# Skip build if images already exist
+./test.sh --skip-build
+
+# Manual testing
+./run.sh --repo git@github.com:user/test-repo.git
 ```
+
+Tests verify:
+- All required tools installed (Flutter, Docker CLI, Claude Code, jq)
+- Orchestrator scripts exist and are executable
+- Plan parsing logic works correctly
+- Task status updates work
+- sudo docker access works
