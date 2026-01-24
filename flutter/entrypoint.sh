@@ -7,6 +7,14 @@ if [ -z "$REPO_URL" ]; then
   exit 1
 fi
 
+# Set up git user config if provided
+if [ -n "$GIT_USER_NAME" ]; then
+  git config --global user.name "$GIT_USER_NAME"
+fi
+if [ -n "$GIT_USER_EMAIL" ]; then
+  git config --global user.email "$GIT_USER_EMAIL"
+fi
+
 echo "Cloning $REPO_URL (branch: $REPO_BRANCH)..."
 git clone --branch "$REPO_BRANCH" --single-branch "$REPO_URL" /app
 

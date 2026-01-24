@@ -66,12 +66,18 @@ if [ ! -f "$SSH_KEY" ]; then
   exit 1
 fi
 
+# Get git config from host
+GIT_USER_NAME="${GIT_USER_NAME:-$(git config --global user.name 2>/dev/null || echo "")}"
+GIT_USER_EMAIL="${GIT_USER_EMAIL:-$(git config --global user.email 2>/dev/null || echo "")}"
+
 # Build docker args
 DOCKER_ARGS=(
   -it --rm
   -e REPO_URL="$REPO_URL"
   -e REPO_BRANCH="$REPO_BRANCH"
   -e CLAUDE_CODE_OAUTH_TOKEN="$(cat "$TOKEN_FILE" | tr -d '\n')"
+  -e GIT_USER_NAME="$GIT_USER_NAME"
+  -e GIT_USER_EMAIL="$GIT_USER_EMAIL"
   -v "$SSH_KEY:/home/dev/.ssh/id_ed25519:ro"
 )
 
