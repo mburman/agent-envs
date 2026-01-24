@@ -73,7 +73,7 @@ echo "your-token-here" > ~/.claude-token
 chmod 600 ~/.claude-token
 
 # Pass to container:
--e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token)"
+-e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token | tr -d '\n')"
 ```
 
 ## Environment Variables (All Environments)
@@ -93,7 +93,7 @@ docker build -t claude-flutter .
 # Test it
 docker run -it --rm \
   -e REPO_URL="git@github.com:user/test-repo.git" \
-  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token)" \
+  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token | tr -d '\n')" \
   -v ~/.ssh/id_ed25519:/home/dev/.ssh/id_ed25519:ro \
   claude-flutter
 ```
