@@ -47,7 +47,7 @@ if [ -z "$REPO_URL" ]; then
   echo "Options:"
   echo "  --repo URL        Repository URL (required)"
   echo "  --branch BRANCH   Branch to clone (default: main)"
-  echo "  --model MODEL     Model to use (default: claude-opus-4-5-20250514)"
+  echo "  --model MODEL     Model to use (default: claude-opus-4-5-20251101)"
   echo "  --token FILE      Token file path (default: ~/.claude-token)"
   echo "  --ssh-key FILE    SSH key path (default: ~/.ssh/id_ed25519)"
   echo ""

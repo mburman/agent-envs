@@ -40,7 +40,7 @@ cat > ~/.claude/settings.json <<'EOF'
 EOF
 
 # Set default model to Opus (can be overridden via ANTHROPIC_MODEL env var)
-export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-claude-opus-4-5-20250514}"
+export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-claude-opus-4-5-20251101}"
 
 echo "Starting Claude Code with model: $ANTHROPIC_MODEL..."
 # Use expect to auto-accept the bypass permissions warning, then hand over to interactive mode

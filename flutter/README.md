@@ -91,7 +91,7 @@ export REPO_URL="git@github.com:user/repo.git"
 |----------|----------|---------|-------------|
 | `REPO_URL` | Yes | - | Git URL of the repo to clone (SSH format) |
 | `REPO_BRANCH` | No | `main` | Branch to clone |
-| `ANTHROPIC_MODEL` | No | `claude-opus-4-5-20250514` | Model to use |
+| `ANTHROPIC_MODEL` | No | `claude-opus-4-5-20251101` | Model to use |
 
 ## Usage Examples
 
