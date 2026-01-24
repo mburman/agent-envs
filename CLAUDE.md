@@ -95,6 +95,7 @@ Tokens from `claude setup-token` have limited scopes (`user:inference` only). Fe
 |----------|---------|
 | `REPO_URL` | SSH URL of repo to clone |
 | `REPO_BRANCH` | Branch to clone (default: `main`) |
+| `ANTHROPIC_MODEL` | Model to use (default: `claude-opus-4-5-20250514`) |
 
 ## Testing
 

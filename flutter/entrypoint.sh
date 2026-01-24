@@ -22,15 +22,26 @@ find . -mindepth 2 -name "pubspec.yaml" -type f | while read pubspec; do
   (cd "$dir" && dart pub get)
 done
 
-# Set up Claude config to skip onboarding
-if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
-  mkdir -p ~/.claude
-  cat > ~/.claude.json <<'EOF'
+# Set up Claude config to skip onboarding and enable bypass permissions mode
+mkdir -p ~/.claude
+cat > ~/.claude.json <<'EOF'
 {
   "hasCompletedOnboarding": true
 }
 EOF
-fi
 
-echo "Starting Claude Code..."
-exec claude --dangerously-skip-permissions "$@"
+# Set bypass permissions in settings to avoid the warning dialog
+cat > ~/.claude/settings.json <<'EOF'
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  }
+}
+EOF
+
+# Set default model to Opus (can be overridden via ANTHROPIC_MODEL env var)
+export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-claude-opus-4-5-20250514}"
+
+echo "Starting Claude Code with model: $ANTHROPIC_MODEL..."
+# Use expect to auto-accept the bypass permissions warning, then hand over to interactive mode
+exec /start-claude.exp "$@"

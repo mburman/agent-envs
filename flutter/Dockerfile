@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     libstdc++-12-dev \
     openssh-client \
     sudo \
+    expect \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20
@@ -61,7 +62,8 @@ ENV REPO_URL=""
 ENV REPO_BRANCH="main"
 
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY start-claude.exp /start-claude.exp
+RUN chmod +x /entrypoint.sh /start-claude.exp
 
 USER dev
 
