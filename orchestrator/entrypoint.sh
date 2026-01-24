@@ -51,9 +51,60 @@ EOF
 # Set default model to Opus (can be overridden via ANTHROPIC_MODEL env var)
 export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-claude-opus-4-5-20251101}"
 
+# Session management
+SESSIONS_DIR="/home/dev/.claude-sessions"
+mkdir -p "$SESSIONS_DIR"
+RESUME_FLAG=""
+
+if [ -n "$SESSION_NAME" ]; then
+  SESSION_PATH="$SESSIONS_DIR/$SESSION_NAME"
+
+  if [ -d "$SESSION_PATH" ]; then
+    echo "Resuming session: $SESSION_NAME"
+    # Restore Claude state from saved session
+    if [ -d "$SESSION_PATH/.claude" ]; then
+      cp -r "$SESSION_PATH/.claude/"* ~/.claude/ 2>/dev/null || true
+    fi
+
+    # Find the session ID to resume
+    RESUME_ID=$(cat "$SESSION_PATH/session-id" 2>/dev/null || echo "")
+    if [ -n "$RESUME_ID" ]; then
+      RESUME_FLAG="--resume $RESUME_ID"
+    fi
+  else
+    echo "Creating new session: $SESSION_NAME"
+    mkdir -p "$SESSION_PATH"
+  fi
+fi
+
+# Function to save session on exit
+save_session() {
+  if [ -n "$SESSION_NAME" ]; then
+    echo ""
+    echo "Saving session: $SESSION_NAME..."
+    SESSION_PATH="$SESSIONS_DIR/$SESSION_NAME"
+    mkdir -p "$SESSION_PATH"
+    cp -r ~/.claude "$SESSION_PATH/" 2>/dev/null || true
+    # Save the most recent session ID for resume
+    # Claude stores sessions in ~/.claude/projects/<path>/sessions/
+    LATEST_SESSION=$(find ~/.claude -name "*.json" -path "*/sessions/*" -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/\.json$//' || echo "")
+    if [ -n "$LATEST_SESSION" ]; then
+      echo "$LATEST_SESSION" > "$SESSION_PATH/session-id"
+    fi
+    echo "Session saved."
+  fi
+}
+
+# Trap EXIT to save session (but only if not using exec)
+trap save_session EXIT
+
 echo "Starting Manager with model: $ANTHROPIC_MODEL..."
 echo "Orchestration volume: /orchestration"
+if [ -n "$SESSION_NAME" ]; then
+  echo "Session: $SESSION_NAME"
+fi
 echo ""
 
 # Start Claude with the Manager system prompt
-exec /start-claude.exp --append-system-prompt "$(cat /opt/orchestrator/system-prompt.md)" "$@"
+# Note: We don't use exec so the trap can run on exit
+/start-claude.exp --append-system-prompt "$(cat /opt/orchestrator/system-prompt.md)" $RESUME_FLAG "$@"

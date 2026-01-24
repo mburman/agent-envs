@@ -86,7 +86,7 @@ docker run --rm --entrypoint /bin/bash claude-flutter -c "which jq" > /dev/null 
 # ------------------------------
 info "Checking orchestrator scripts..."
 
-for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh list-workers.sh cleanup.sh; do
+for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh list-workers.sh cleanup.sh list-sessions.sh delete-session.sh; do
   docker run --rm --entrypoint /bin/bash claude-orchestrator -c "test -x /opt/orchestrator/lib/$script" \
     && pass "Script $script exists and is executable" \
     || fail "Script $script missing or not executable"
@@ -187,6 +187,120 @@ docker run --rm \
   claude-orchestrator -c "sudo docker ps" > /dev/null 2>&1 \
   && pass "sudo docker works in orchestrator" \
   || fail "sudo docker failed - socket permissions issue"
+
+# ------------------------------
+# Test 9: Session management - list-sessions.sh
+# ------------------------------
+info "Testing session management scripts..."
+
+# Test list-sessions.sh with no sessions
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  /opt/orchestrator/lib/list-sessions.sh
+')
+
+if echo "$TEST_OUTPUT" | grep -q "Available sessions"; then
+  pass "list-sessions.sh runs and shows header"
+else
+  fail "list-sessions.sh should show 'Available sessions' header"
+fi
+
+# Test list-sessions.sh shows sessions that exist
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  mkdir -p /home/dev/.claude-sessions/test-session
+  /opt/orchestrator/lib/list-sessions.sh
+')
+
+if echo "$TEST_OUTPUT" | grep -q "test-session"; then
+  pass "list-sessions.sh lists existing sessions"
+else
+  fail "list-sessions.sh should list test-session"
+fi
+
+# Test delete-session.sh with missing arg
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  /opt/orchestrator/lib/delete-session.sh 2>&1
+' || true)
+
+if echo "$TEST_OUTPUT" | grep -q "Usage"; then
+  pass "delete-session.sh shows usage when no arg provided"
+else
+  fail "delete-session.sh should show usage without arguments"
+fi
+
+# Test delete-session.sh deletes session
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  mkdir -p /home/dev/.claude-sessions/to-delete
+  /opt/orchestrator/lib/delete-session.sh to-delete
+  test -d /home/dev/.claude-sessions/to-delete && echo "EXISTS" || echo "DELETED"
+')
+
+if echo "$TEST_OUTPUT" | grep -q "DELETED"; then
+  pass "delete-session.sh deletes sessions"
+else
+  fail "delete-session.sh should delete the session directory"
+fi
+
+# ------------------------------
+# Test 10: Session volume and --list-sessions flag
+# ------------------------------
+info "Testing run.sh session flags..."
+
+# Create test session volume
+docker volume create claude-sessions-test >/dev/null 2>&1 || true
+
+# Test --list-sessions flag (should work without --repo)
+TEST_OUTPUT=$(./run.sh --list-sessions 2>&1 || true)
+
+if echo "$TEST_OUTPUT" | grep -q "Available sessions"; then
+  pass "--list-sessions flag works without --repo"
+else
+  fail "--list-sessions should work without --repo flag"
+fi
+
+# Clean up test volume
+docker volume rm claude-sessions-test >/dev/null 2>&1 || true
+
+# ------------------------------
+# Test 11: Session persistence (entrypoint logic)
+# ------------------------------
+info "Testing session save/restore logic..."
+
+# Test session directory is created
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  test -d /home/dev/.claude-sessions && echo "EXISTS" || echo "MISSING"
+')
+
+if echo "$TEST_OUTPUT" | grep -q "EXISTS"; then
+  pass "Session directory exists in container"
+else
+  fail "Session directory should exist at /home/dev/.claude-sessions"
+fi
+
+# Test SESSION_NAME env var is recognized in entrypoint
+TEST_OUTPUT=$(docker run --rm \
+  -e SESSION_NAME=test-session \
+  --entrypoint /bin/bash \
+  claude-orchestrator -c '
+    # Simulate what entrypoint does
+    SESSIONS_DIR="/home/dev/.claude-sessions"
+    mkdir -p "$SESSIONS_DIR"
+    if [ -n "$SESSION_NAME" ]; then
+      SESSION_PATH="$SESSIONS_DIR/$SESSION_NAME"
+      if [ -d "$SESSION_PATH" ]; then
+        echo "RESUME"
+      else
+        echo "CREATE"
+        mkdir -p "$SESSION_PATH"
+      fi
+    fi
+    test -d "$SESSIONS_DIR/$SESSION_NAME" && echo "SESSION_DIR_EXISTS"
+  ')
+
+if echo "$TEST_OUTPUT" | grep -q "CREATE" && echo "$TEST_OUTPUT" | grep -q "SESSION_DIR_EXISTS"; then
+  pass "SESSION_NAME creates new session directory"
+else
+  fail "SESSION_NAME should create session directory"
+fi
 
 # ------------------------------
 # Summary

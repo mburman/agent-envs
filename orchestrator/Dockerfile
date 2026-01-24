@@ -65,9 +65,9 @@ RUN mkdir -p /home/dev/.ssh \
     && chown -R dev:dev /home/dev/.ssh \
     && chmod 700 /home/dev/.ssh
 
-# Prepare Claude config directory
-RUN mkdir -p /home/dev/.config/claude-code /home/dev/.claude \
-    && chown -R dev:dev /home/dev/.config /home/dev/.claude
+# Prepare Claude config directory and sessions directory
+RUN mkdir -p /home/dev/.config/claude-code /home/dev/.claude /home/dev/.claude-sessions \
+    && chown -R dev:dev /home/dev/.config /home/dev/.claude /home/dev/.claude-sessions
 
 # Copy orchestrator files
 COPY entrypoint.sh /entrypoint.sh

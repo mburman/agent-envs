@@ -22,6 +22,8 @@ agent-envs/
 │       ├── get-ready-tasks.sh
 │       ├── update-task-status.sh
 │       ├── list-workers.sh
+│       ├── list-sessions.sh
+│       ├── delete-session.sh
 │       └── cleanup.sh
 └── flutter/               # Worker agent environment
     ├── Dockerfile         # Ubuntu + Flutter SDK + Node.js + Claude Code
@@ -142,6 +144,7 @@ Tokens from `claude setup-token` have limited scopes (`user:inference` only). Fe
 | `REPO_URL` | SSH URL of repo to clone |
 | `REPO_BRANCH` | Branch to clone (default: `main`) |
 | `ANTHROPIC_MODEL` | Model to use (default: `claude-opus-4-5-20251101`) |
+| `SESSION_NAME` | Named session to create or resume |
 
 ## Testing
 
@@ -162,3 +165,28 @@ Tests verify:
 - Plan parsing logic works correctly
 - Task status updates work
 - sudo docker access works
+
+## Session Management
+
+Named sessions persist your Claude conversation across container restarts. This is useful for long-running projects or when you need to stop and resume work.
+
+```bash
+# Start a new named session
+./run.sh --repo git@github.com:user/app.git --session dark-mode-feature
+
+# List available sessions
+./run.sh --list-sessions
+
+# Resume an existing session (same command as starting)
+./run.sh --repo git@github.com:user/app.git --session dark-mode-feature
+
+# Inside the container, you can also:
+/opt/orchestrator/lib/list-sessions.sh      # List sessions
+/opt/orchestrator/lib/delete-session.sh my-session  # Delete a session
+```
+
+Sessions are stored in the `claude-sessions` Docker volume. Each session saves:
+- Claude conversation history
+- Session ID for resumption
+
+Note: Orchestration state (plan.json, task files, results) is stored separately in the `orchestration-volume` and persists across all sessions.

@@ -22,6 +22,12 @@ The orchestration system lets a Manager agent spawn and coordinate Worker agents
 # Start the Manager
 ./run.sh --repo git@github.com:your-user/your-flutter-app.git
 
+# Or start with a named session (for resumption)
+./run.sh --repo git@github.com:your-user/your-flutter-app.git --session my-feature
+
+# List available sessions
+./run.sh --list-sessions
+
 # Talk to the Manager naturally
 You: "Add dark mode support to the app"
 Manager: [Creates plan, spawns workers, monitors progress, applies patches]
