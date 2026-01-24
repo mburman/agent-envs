@@ -6,6 +6,7 @@ set -e
 
 ENVIRONMENT="${1:-flutter}"
 TASK_ID="$2"
+STAGGER_SECONDS=5  # Minimum seconds between worker starts
 
 if [ -z "$TASK_ID" ]; then
   echo "Usage: spawn-worker.sh <environment> <task-id>"
@@ -69,6 +70,24 @@ fi
 
 # Image name based on environment
 IMAGE_NAME="claude-${ENVIRONMENT}"
+
+# Stagger worker starts to avoid API rate limits and timeouts
+LAST_SPAWN_FILE="/orchestration/status/.last-spawn"
+NOW=$(date +%s)
+
+if [ -f "$LAST_SPAWN_FILE" ]; then
+  LAST_SPAWN=$(cat "$LAST_SPAWN_FILE" 2>/dev/null || echo "0")
+  ELAPSED=$((NOW - LAST_SPAWN))
+
+  if [ "$ELAPSED" -lt "$STAGGER_SECONDS" ]; then
+    WAIT_TIME=$((STAGGER_SECONDS - ELAPSED))
+    echo "Staggering start: waiting ${WAIT_TIME}s before spawning..."
+    sleep "$WAIT_TIME"
+  fi
+fi
+
+# Record this spawn time
+echo "$(date +%s)" > "$LAST_SPAWN_FILE"
 
 # Run the worker container
 sudo $DOCKER run "${DOCKER_ARGS[@]}" "$IMAGE_NAME"
