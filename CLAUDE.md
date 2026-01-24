@@ -11,49 +11,57 @@ agent-envs/
 ├── build.sh               # Build all images
 ├── run.sh                 # Start the Manager
 ├── test.sh                # Run tests
-├── orchestrator/          # Manager agent environment
-│   ├── Dockerfile         # Ubuntu + Flutter + Docker CLI + Claude Code
-│   ├── entrypoint.sh      # Clones repo, starts Claude with system prompt
-│   ├── system-prompt.md   # Manager orchestration instructions
-│   ├── README.md
-│   └── lib/               # Orchestration scripts
-│       ├── spawn-worker.sh
-│       ├── show-plan.sh
-│       ├── get-ready-tasks.sh
-│       ├── update-task-status.sh
-│       ├── list-workers.sh
-│       ├── list-sessions.sh
-│       ├── delete-session.sh
-│       └── cleanup.sh
-└── flutter/               # Worker agent environment
-    ├── Dockerfile         # Ubuntu + Flutter SDK + Node.js + Claude Code
-    ├── entrypoint.sh      # Clones repo, supports worker mode
-    └── README.md
+├── lib/
+│   └── worktree/          # Worktree management scripts (source)
+│       ├── create-worktree.sh
+│       ├── collect-patch.sh
+│       ├── cleanup-worktree.sh
+│       └── cleanup-all.sh
+├── .claude/
+│   └── agents/
+│       └── task-worker.md # Worker sub-agent definition
+└── orchestrator/          # Manager agent environment
+    ├── Dockerfile         # Ubuntu + Flutter + Docker CLI + Claude Code
+    ├── entrypoint.sh      # Clones repo, starts Claude with system prompt
+    ├── system-prompt.md   # Manager orchestration instructions
+    ├── README.md
+    └── lib/               # Orchestration scripts
+        ├── spawn-worker.sh    # Create worktree + instructions
+        ├── check-workers.sh   # Monitor sub-agents
+        ├── show-plan.sh
+        ├── get-ready-tasks.sh
+        ├── update-task-status.sh
+        ├── cleanup.sh
+        └── worktree/          # Worktree scripts (copied from lib/)
 ```
 
 ## Orchestration System
 
-The orchestration system enables a Manager agent to coordinate multiple Worker agents:
+The orchestration system enables a Manager agent to coordinate multiple Worker sub-agents:
 
 **Manager** (`orchestrator/`):
 - Interactive Claude Code session you talk to directly
-- Has Flutter, Docker CLI, and all dev tools
+- Runs in Docker container with `--dangerously-skip-permissions` (sandboxed)
+- Has Flutter, all dev tools, and Claude Code
 - Creates dependency graphs of tasks
-- Spawns workers for parallel execution
-- Applies worker patches and commits (quality control)
+- Spawns worker sub-agents via Claude's Task tool
+- Workers run in isolated git worktrees
+- Collects patches and commits (quality control)
 - Can run `flutter test` and `flutter run` for verification
 
-**Workers** (`flutter/` in worker mode):
-- Headless Claude Code instances (`claude -p`)
-- Clone repo fresh, execute one task, exit
+**Workers** (sub-agents in worktrees):
+- Claude Code sub-agents spawned via Task tool
+- Work in isolated git worktrees (`.worktrees/<task-id>/`)
 - Cannot commit or push (git hooks block it)
 - Generate patches for Manager to review/apply
+- Much faster than Docker containers (~instant startup)
 
 **Communication**:
-- Shared Docker volume at `/orchestration`
+- `/orchestration` directory (Docker volume)
 - `plan.json` - Dependency graph with task status
 - `tasks/*.json` - Task definitions with prompts
 - `results/*.json` and `*.patch` - Worker output
+- `status/*.json` - Worker heartbeat/progress
 
 **Usage**:
 ```bash
@@ -62,51 +70,30 @@ The orchestration system enables a Manager agent to coordinate multiple Worker a
 ./test.sh                                     # Run tests
 ```
 
-## Flutter Environment
+## Worker Architecture (Worktrees + Sub-Agents)
 
-The Flutter environment (`flutter/`) includes:
-- Ubuntu 22.04, Flutter SDK (stable), Dart SDK, Node.js 20, Claude Code CLI
-- Build tools: clang, cmake, ninja, pkg-config, GTK3
+Workers are implemented as:
+1. **Git worktrees** for filesystem isolation
+2. **Claude Code sub-agents** (via Task tool) for execution
 
-**Monorepo support**: The entrypoint automatically detects and installs dependencies for any subdirectory containing a `pubspec.yaml`. This handles common structures like:
-- `packages/*/pubspec.yaml` (Dart packages)
-- `mcp/pubspec.yaml` (MCP servers)
-- Any other nested Dart/Flutter packages
+### How It Works
 
-## Adding a New Environment
+1. Manager creates a worktree: `.worktrees/task-001/` on branch `worker/task-001`
+2. Manager spawns a sub-agent via Task tool with `task-worker` type
+3. Sub-agent works in the worktree, making code changes
+4. Git hooks prevent the sub-agent from committing
+5. Manager collects a patch from the worktree changes
+6. Manager applies patch to main `/app` directory
+7. Manager reviews, tests, and commits
 
-1. Create a new directory (e.g., `python/`, `node/`, `rust/`)
-2. Add these files:
-   - `Dockerfile` - Base image with all tools needed
-   - `entrypoint.sh` - Script that clones repo, installs deps, starts Claude
-   - `README.md` - Environment-specific docs
+### Benefits Over Docker Workers
 
-3. Update the root README.md to list the new environment
-
-## Common Patterns
-
-Each environment follows this pattern:
-
-```dockerfile
-# Dockerfile
-FROM base-image
-# Install language toolchain
-# Install Node.js (for Claude Code)
-# Install Claude Code: npm install -g @anthropic-ai/claude-code
-# Prepare SSH for GitHub
-COPY entrypoint.sh /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
-```
-
-```bash
-# entrypoint.sh
-#!/bin/bash
-set -e
-# Validate REPO_URL
-# Clone repo
-# Install dependencies
-exec claude --dangerously-skip-permissions "$@"
-```
+| Aspect | Docker Workers | Worktree Sub-Agents |
+|--------|----------------|---------------------|
+| Startup | 10-30s (clone + deps) | <1s (instant) |
+| Isolation | OS-level | Filesystem (worktrees) |
+| Parallelism | Unlimited | ~7 sub-agents |
+| Dependencies | Fresh install each | Shared with Manager |
 
 ## Authentication
 
@@ -133,10 +120,6 @@ The entrypoint script creates `~/.claude.json` with `hasCompletedOnboarding: tru
 
 **Important**: Use `tr -d '\n'` to strip newlines, which cause "invalid header value" errors.
 
-### Limitations
-
-Tokens from `claude setup-token` have limited scopes (`user:inference` only). Features requiring `user:profile` scope (like `/usage`) will fail with permission errors. All coding features work normally.
-
 ## Environment Variables (All Environments)
 
 | Variable | Purpose |
@@ -144,7 +127,7 @@ Tokens from `claude setup-token` have limited scopes (`user:inference` only). Fe
 | `REPO_URL` | SSH URL of repo to clone |
 | `REPO_BRANCH` | Branch to clone (default: `main`) |
 | `ANTHROPIC_MODEL` | Model to use (default: `claude-opus-4-5-20251101`) |
-| `SESSION_NAME` | Named session to create or resume |
+| `SESSION_NAME` | Session to create or resume (auto-generated if not provided) |
 
 ## Testing
 
@@ -159,19 +142,15 @@ Tokens from `claude setup-token` have limited scopes (`user:inference` only). Fe
 ./run.sh --repo git@github.com:user/test-repo.git
 ```
 
-Tests verify:
-- All required tools installed (Flutter, Docker CLI, Claude Code, jq)
-- Orchestrator scripts exist and are executable
-- Plan parsing logic works correctly
-- Task status updates work
-- sudo docker access works
-
 ## Session Management
 
-Named sessions persist your Claude conversation and repo state across container restarts. This is useful for long-running projects or when you need to stop and resume work.
+Sessions persist your Claude conversation and repo state across container restarts. Session IDs are auto-generated if not provided.
 
 ```bash
-# Start a new named session
+# Start a new session (auto-generates ID like s-20250124-143022)
+./run.sh --repo git@github.com:user/app.git
+
+# Start with a custom session name
 ./run.sh --repo git@github.com:user/app.git --session dark-mode-feature
 
 # List available sessions
@@ -180,16 +159,30 @@ Named sessions persist your Claude conversation and repo state across container 
 # Resume an existing session (no --repo needed!)
 ./run.sh --session dark-mode-feature
 
-# Inside the container, you can also:
+# Inside the container:
 /opt/orchestrator/lib/list-sessions.sh           # List sessions
 /opt/orchestrator/lib/delete-session.sh my-session  # Delete a session
 ```
 
 Each session persists:
 - Claude conversation history (for `--resume`)
-- Repository state including uncommitted changes (per-session volume)
+- Repository state including uncommitted changes
+- Worktrees and orchestration state
 
 Docker volumes used:
 - `claude-sessions` - Session metadata and Claude state
 - `claude-repo-<session-name>` - Per-session repo state
-- `orchestration-volume` - Shared orchestration state (plan, tasks, results)
+- `orchestration-volume` - Shared orchestration state
+
+## Orchestrator Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `spawn-worker.sh <task-id>` | Create worktree, print sub-agent instructions |
+| `check-workers.sh` | Show worker status (running/completed/stuck) |
+| `show-plan.sh` | Display dependency graph |
+| `get-ready-tasks.sh` | List tasks with no unmet dependencies |
+| `update-task-status.sh <id> <status>` | Update task status in plan |
+| `cleanup.sh --worktrees\|--state\|--all` | Clean up worktrees and/or state |
+| `worktree/collect-patch.sh <task-id>` | Collect patch from completed worktree |
+| `worktree/cleanup-worktree.sh <task-id>` | Remove single worktree |

@@ -64,12 +64,12 @@ while [[ $# -gt 0 ]]; do
       echo "  --ssh-key FILE    SSH key for git (default: ~/.ssh/id_ed25519)"
       echo "  --model MODEL     Model to use (default: claude-opus-4-5-20251101)"
       echo "  --port PORT       Port for Flutter web server (default: 8080)"
-      echo "  --session NAME    Named session (creates new or resumes existing)"
+      echo "  --session NAME    Named session (auto-generated if not provided)"
       echo "  --list-sessions   List available sessions to resume"
-      echo "  --clean-all       Reset all state (sessions, repos, orchestration, workers)"
+      echo "  --clean-all       Reset all state (sessions, repos, orchestration)"
       echo ""
       echo "Examples:"
-      echo "  $0 --repo git@github.com:user/app.git                    # Fresh start (no session)"
+      echo "  $0 --repo git@github.com:user/app.git                    # New auto-named session"
       echo "  $0 --repo git@github.com:user/app.git --session feature  # New named session"
       echo "  $0 --session feature                                     # Resume session"
       exit 0
@@ -82,6 +82,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Auto-generate session ID if not provided
+if [ -z "$SESSION_NAME" ] && [ "$LIST_SESSIONS" = false ] && [ "$CLEAN_ALL" = false ]; then
+  SESSION_NAME="s-$(date +%Y%m%d-%H%M%S)"
+fi
+
 # Handle list-sessions command (doesn't require --repo)
 if [ "$LIST_SESSIONS" = true ]; then
   echo "Available sessions:"
@@ -90,7 +95,7 @@ if [ "$LIST_SESSIONS" = true ]; then
     echo "  $session"
   done || echo "  (no sessions found)"
   echo ""
-  echo "To resume: $0 --repo <url> --session <name>"
+  echo "To resume: $0 --session <name>"
   exit 0
 fi
 
@@ -99,17 +104,11 @@ if [ "$CLEAN_ALL" = true ]; then
   echo "Resetting all state..."
   echo ""
 
-  # Stop and remove manager container
-  if docker ps -q --filter "name=claude-manager" 2>/dev/null | grep -q .; then
-    echo "Stopping manager container..."
-    docker rm -f claude-manager 2>/dev/null || true
-  fi
-
-  # Stop and remove any worker containers
-  WORKERS=$(docker ps -aq --filter "name=worker-" 2>/dev/null || true)
-  if [ -n "$WORKERS" ]; then
-    echo "Stopping worker containers..."
-    docker rm -f $WORKERS 2>/dev/null || true
+  # Stop and remove all claude containers (manager and session containers)
+  CONTAINERS=$(docker ps -aq --filter "name=claude-" 2>/dev/null || true)
+  if [ -n "$CONTAINERS" ]; then
+    echo "Stopping containers..."
+    docker rm -f $CONTAINERS 2>/dev/null || true
   fi
 
   # Remove orchestration volume
@@ -128,7 +127,7 @@ if [ "$CLEAN_ALL" = true ]; then
 
   echo ""
   echo "Done. All state has been reset:"
-  echo "  ✓ Manager and worker containers removed"
+  echo "  ✓ Containers removed"
   echo "  ✓ Orchestration volume removed"
   echo "  ✓ Sessions volume removed"
   echo "  ✓ Repo volumes removed"
@@ -148,7 +147,7 @@ fi
 # Validate - repo is required for new sessions, optional for existing ones
 if [ -z "$REPO_URL" ] && [ "$SESSION_EXISTS" = false ]; then
   echo "Error: --repo is required for new sessions"
-  echo "Usage: $0 --repo git@github.com:user/repo.git --session <name>"
+  echo "Usage: $0 --repo git@github.com:user/repo.git"
   echo ""
   echo "To resume an existing session: $0 --session <name>"
   echo "To list sessions: $0 --list-sessions"
@@ -188,11 +187,18 @@ if [ -n "$SESSION_NAME" ]; then
   docker volume create "$REPO_VOLUME" >/dev/null 2>&1 || true
 fi
 
+# Container name based on session
+if [ -n "$SESSION_NAME" ]; then
+  CONTAINER_NAME="claude-${SESSION_NAME}"
+else
+  CONTAINER_NAME="claude-manager"
+fi
+
 # Build docker args
 DOCKER_ARGS=(
   -it
   --init
-  --name claude-manager
+  --name "$CONTAINER_NAME"
   --group-add "$DOCKER_GID"
   -e TERM="${TERM:-xterm-256color}"
   -p "${WEB_PORT}:${WEB_PORT}"
@@ -218,13 +224,11 @@ fi
 [ -n "$SESSION_NAME" ] && DOCKER_ARGS+=(-e SESSION_NAME="$SESSION_NAME")
 
 # Remove existing stopped container if present
-docker rm claude-manager 2>/dev/null || true
+docker rm "$CONTAINER_NAME" 2>/dev/null || true
 
-if [ -n "$SESSION_NAME" ] && [ "$SESSION_EXISTS" = true ]; then
+if [ "$SESSION_EXISTS" = true ]; then
   echo "Resuming session: $SESSION_NAME"
-elif [ -n "$SESSION_NAME" ]; then
-  echo "Starting new session: $SESSION_NAME (repo: $REPO_URL)"
 else
-  echo "Starting Manager for: $REPO_URL"
+  echo "Starting new session: $SESSION_NAME (repo: $REPO_URL)"
 fi
 docker run "${DOCKER_ARGS[@]}" claude-orchestrator

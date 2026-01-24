@@ -1,0 +1,19 @@
+# Worktrees (created by workers)
+.worktrees/
+
+# Orchestration state (inside repo when running)
+.orchestration/
+
+# Node modules (if any local testing)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/

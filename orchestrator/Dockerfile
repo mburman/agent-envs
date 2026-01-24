@@ -20,12 +20,17 @@ RUN apt-get update && apt-get install -y \
     libstdc++-12-dev \
     openssh-client \
     sudo \
-    expect \
     jq \
     ca-certificates \
     gnupg \
     ncurses-bin \
+    locales \
     && rm -rf /var/lib/apt/lists/*
+
+# Set up UTF-8 locale for proper terminal rendering
+RUN locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # Install Docker CLI (NOT the daemon - we'll use host's Docker via socket)
 RUN install -m 0755 -d /etc/apt/keyrings \
@@ -72,15 +77,9 @@ RUN mkdir -p /home/dev/.config/claude-code /home/dev/.claude /home/dev/.claude-s
 
 # Copy orchestrator files
 COPY entrypoint.sh /entrypoint.sh
-COPY start-claude.exp /start-claude.exp
 COPY system-prompt.md /opt/orchestrator/system-prompt.md
 COPY lib/ /opt/orchestrator/lib/
-RUN chmod +x /entrypoint.sh /start-claude.exp /opt/orchestrator/lib/*.sh
-
-# Install docker wrapper to prevent direct worker spawning
-# The wrapper blocks "docker run" for worker-like commands and directs to spawn-worker.sh
-RUN cp /opt/orchestrator/lib/docker-wrapper.sh /usr/local/bin/docker \
-    && chmod +x /usr/local/bin/docker
+RUN chmod +x /entrypoint.sh /opt/orchestrator/lib/*.sh /opt/orchestrator/lib/worktree/*.sh
 
 WORKDIR /app
 

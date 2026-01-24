@@ -35,10 +35,6 @@ if [ "$SKIP_BUILD" = false ]; then
   docker build -t claude-orchestrator orchestrator/ > /dev/null 2>&1 \
     && pass "Built claude-orchestrator" \
     || fail "Failed to build claude-orchestrator"
-
-  docker build -t claude-flutter flutter/ > /dev/null 2>&1 \
-    && pass "Built claude-flutter" \
-    || fail "Failed to build claude-flutter"
 else
   info "Skipping build (--skip-build)"
 fi
@@ -64,32 +60,30 @@ docker run --rm --entrypoint /bin/bash claude-orchestrator -c "which jq" > /dev/
   && pass "jq installed in orchestrator" \
   || fail "jq not found in orchestrator"
 
-# ------------------------------
-# Test 3: Verify tools installed in flutter worker
-# ------------------------------
-info "Checking flutter worker has required tools..."
-
-docker run --rm --entrypoint /bin/bash claude-flutter -c "which flutter" > /dev/null 2>&1 \
-  && pass "Flutter installed in worker" \
-  || fail "Flutter not found in worker"
-
-docker run --rm --entrypoint /bin/bash claude-flutter -c "which claude" > /dev/null 2>&1 \
-  && pass "Claude Code installed in worker" \
-  || fail "Claude Code not found in worker"
-
-docker run --rm --entrypoint /bin/bash claude-flutter -c "which jq" > /dev/null 2>&1 \
-  && pass "jq installed in worker" \
-  || fail "jq not found in worker"
+docker run --rm --entrypoint /bin/bash claude-orchestrator -c "which git" > /dev/null 2>&1 \
+  && pass "git installed in orchestrator" \
+  || fail "git not found in orchestrator"
 
 # ------------------------------
-# Test 4: Verify orchestrator scripts exist and are executable
+# Test 3: Verify orchestrator scripts exist and are executable
 # ------------------------------
 info "Checking orchestrator scripts..."
 
-for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh list-workers.sh cleanup.sh list-sessions.sh delete-session.sh check-workers.sh kill-stuck-workers.sh; do
+for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh cleanup.sh list-sessions.sh delete-session.sh check-workers.sh; do
   docker run --rm --entrypoint /bin/bash claude-orchestrator -c "test -x /opt/orchestrator/lib/$script" \
     && pass "Script $script exists and is executable" \
     || fail "Script $script missing or not executable"
+done
+
+# ------------------------------
+# Test 4: Verify worktree scripts exist
+# ------------------------------
+info "Checking worktree scripts..."
+
+for script in create-worktree.sh collect-patch.sh cleanup-worktree.sh cleanup-all.sh; do
+  docker run --rm --entrypoint /bin/bash claude-orchestrator -c "test -x /opt/orchestrator/lib/worktree/$script" \
+    && pass "Worktree script $script exists and is executable" \
+    || fail "Worktree script $script missing or not executable"
 done
 
 # ------------------------------
@@ -177,19 +171,7 @@ else
 fi
 
 # ------------------------------
-# Test 8: Verify sudo docker works
-# ------------------------------
-info "Testing sudo docker access..."
-
-docker run --rm \
-  --entrypoint /bin/bash \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  claude-orchestrator -c "sudo docker ps" > /dev/null 2>&1 \
-  && pass "sudo docker works in orchestrator" \
-  || fail "sudo docker failed - socket permissions issue"
-
-# ------------------------------
-# Test 9: Session management - list-sessions.sh
+# Test 8: Session management - list-sessions.sh
 # ------------------------------
 info "Testing session management scripts..."
 
@@ -241,7 +223,7 @@ else
 fi
 
 # ------------------------------
-# Test 10: Session volume and --list-sessions flag
+# Test 9: Session volume and --list-sessions flag
 # ------------------------------
 info "Testing run.sh session flags..."
 
@@ -261,7 +243,7 @@ fi
 docker volume rm claude-sessions-test >/dev/null 2>&1 || true
 
 # ------------------------------
-# Test 11: Session persistence (entrypoint logic)
+# Test 10: Session persistence (entrypoint logic)
 # ------------------------------
 info "Testing session save/restore logic..."
 

@@ -7,55 +7,6 @@ on:
     branches: [ main ]
 
 jobs:
-  test-flutter:
-    name: Test Flutter Environment
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build Flutter image
-      run: |
-        cd flutter
-        docker build -t claude-flutter .
-
-    - name: Test Flutter installation
-      run: |
-        docker run --rm --entrypoint /bin/bash claude-flutter -c "
-          set -e
-          echo 'Testing Flutter installation...'
-          flutter --version
-          echo '---'
-          echo 'Testing Dart installation...'
-          dart --version
-          echo '---'
-          echo 'Testing Node.js installation...'
-          node --version
-          npm --version
-          echo '---'
-          echo 'Testing Claude Code installation...'
-          claude --version
-          echo '---'
-          echo 'Testing Git installation...'
-          git --version
-          echo '---'
-          echo 'Testing entrypoint script exists...'
-          test -x /entrypoint.sh && echo 'entrypoint.sh is executable'
-          echo '---'
-          echo 'Testing Flutter permissions...'
-          flutter doctor --version
-          echo '---'
-          echo 'All tests passed!'
-        "
-
-    - name: Test entrypoint validation
-      run: |
-        docker run --rm claude-flutter 2>&1 | grep -q "REPO_URL environment variable is required" && echo "Entrypoint validation works"
-
   test-orchestrator:
     name: Test Orchestrator Environment
     runs-on: ubuntu-latest
@@ -88,6 +39,9 @@ jobs:
           echo 'Testing jq installation...'
           jq --version
           echo '---'
+          echo 'Testing git installation...'
+          git --version
+          echo '---'
           echo 'All tools installed!'
         "
 
@@ -95,10 +49,20 @@ jobs:
       run: |
         docker run --rm --entrypoint /bin/bash claude-orchestrator -c "
           set -e
-          for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh list-workers.sh cleanup.sh list-sessions.sh delete-session.sh check-workers.sh kill-stuck-workers.sh; do
+          for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh cleanup.sh list-sessions.sh delete-session.sh check-workers.sh; do
             test -x /opt/orchestrator/lib/\$script && echo \"✓ \$script\"
           done
           echo 'All scripts present!'
+        "
+
+    - name: Test worktree scripts exist
+      run: |
+        docker run --rm --entrypoint /bin/bash claude-orchestrator -c "
+          set -e
+          for script in create-worktree.sh collect-patch.sh cleanup-worktree.sh cleanup-all.sh; do
+            test -x /opt/orchestrator/lib/worktree/\$script && echo \"✓ worktree/\$script\"
+          done
+          echo 'All worktree scripts present!'
         "
 
     - name: Test plan parsing logic
@@ -180,7 +144,7 @@ jobs:
   test-integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [test-flutter, test-orchestrator]
+    needs: [test-orchestrator]
 
     steps:
     - name: Checkout code
@@ -189,10 +153,9 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build both images
+    - name: Build image
       run: |
         docker build -t claude-orchestrator orchestrator/
-        docker build -t claude-flutter flutter/
 
     - name: Test sudo docker access
       run: |

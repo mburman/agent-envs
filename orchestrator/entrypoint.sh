@@ -121,5 +121,6 @@ fi
 echo ""
 
 # Start Claude with the Manager system prompt
+# The settings.json already sets defaultMode: "bypassPermissions" so we don't need the flag
 # Note: We don't use exec so the trap can run on exit
-/start-claude.exp --append-system-prompt "$(cat /opt/orchestrator/system-prompt.md)" $RESUME_FLAG "$@"
+claude --append-system-prompt "$(cat /opt/orchestrator/system-prompt.md)" $RESUME_FLAG "$@"

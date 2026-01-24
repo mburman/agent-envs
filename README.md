@@ -4,19 +4,12 @@
 
 Docker environments for running [Claude Code](https://github.com/anthropics/claude-code) with `--dangerously-skip-permissions` in isolated containers.
 
-## Available Environments
+## Quick Start
 
-| Environment | Description |
-|-------------|-------------|
-| [orchestrator/](./orchestrator/) | **Manager agent** - coordinates workers, has Flutter + Docker CLI |
-| [flutter/](./flutter/) | **Worker agent** - Flutter + Dart with monorepo support |
-
-## Quick Start (Orchestration)
-
-The orchestration system lets a Manager agent spawn and coordinate Worker agents:
+The orchestration system lets a Manager agent spawn and coordinate Worker sub-agents:
 
 ```bash
-# Build all images
+# Build the image
 ./build.sh
 
 # Start the Manager
@@ -30,18 +23,26 @@ The orchestration system lets a Manager agent spawn and coordinate Worker agents
 
 # Talk to the Manager naturally
 You: "Add dark mode support to the app"
-Manager: [Creates plan, spawns workers, monitors progress, applies patches]
+Manager: [Creates plan, spawns worker sub-agents, monitors progress, applies patches]
 ```
 
 See [orchestrator/README.md](./orchestrator/README.md) for full documentation.
 
-## Why?
+## Architecture
 
-Running Claude Code with `--dangerously-skip-permissions` allows it to execute commands without confirmation prompts. This is useful for autonomous coding tasks but risky on your host machine. These containers provide:
+- **Manager** runs in a Docker container with `--dangerously-skip-permissions` (sandboxed)
+- **Workers** are Claude Code sub-agents spawned via the Task tool
+- Workers operate in isolated **git worktrees** (`.worktrees/<task-id>/`)
+- Workers cannot commit or push (git hooks block them)
+- Manager collects patches, reviews, and commits
+
+## Why Docker?
+
+Running Claude Code with `--dangerously-skip-permissions` allows it to execute commands without confirmation prompts. This is useful for autonomous coding tasks but risky on your host machine. The Docker container provides:
 
 - **Isolation**: Claude can only modify files inside the container
-- **Fresh state**: Each run clones your repo fresh - changes are discarded when the container stops
-- **Full toolchain**: All dependencies pre-installed for each environment
+- **Session persistence**: Named sessions survive container restarts
+- **Full toolchain**: All dependencies pre-installed (Flutter, Node.js, etc.)
 
 ## Prerequisites
 
@@ -56,46 +57,15 @@ echo "your-token-here" > ~/.claude-token
 chmod 600 ~/.claude-token
 ```
 
-**Note**: The token from `claude setup-token` has limited scopes. Features like `/usage` will fail with permission errors, but all coding features (read, write, edit, bash, etc.) work fine.
-
-## Quick Start
-
-### Option A: Use Pre-built Image (Recommended)
-
-```bash
-cd flutter
-docker pull ghcr.io/mburman/agent-envs/flutter:latest
-docker tag ghcr.io/mburman/agent-envs/flutter:latest claude-flutter
-./run.sh --repo git@github.com:your-username/your-repo.git
-```
-
-### Option B: Build Locally
-
-```bash
-cd flutter
-docker build -t claude-flutter .
-./run.sh --repo git@github.com:your-username/your-repo.git
-```
-
-## Adding New Environments
-
-Create a new directory with:
-```
-new-env/
-├── Dockerfile
-├── entrypoint.sh
-└── README.md
-```
-
-See existing environments for examples.
+**Note**: The token from `claude setup-token` has limited scopes. Features like `/usage` will fail with permission errors, but all coding features work fine.
 
 ## Security Notes
 
 - SSH keys are mounted **read-only** - Claude cannot modify them
 - Claude token is passed via environment variable (not stored in image)
 - Claude cannot access your host filesystem (only the cloned repo inside the container)
-- Changes are ephemeral - nothing persists unless you explicitly mount volumes
 - Containers run as non-root user (`dev`), isolated from your host
+- Workers run in git worktrees with commit/push hooks disabled
 
 ## License
 
