@@ -12,6 +12,7 @@ SSH_KEY="${HOME}/.ssh/id_ed25519"
 WEB_PORT="${WEB_PORT:-8080}"
 SESSION_NAME=""
 LIST_SESSIONS=false
+CLEAN_ALL=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -48,6 +49,10 @@ while [[ $# -gt 0 ]]; do
       LIST_SESSIONS=true
       shift
       ;;
+    --clean-all)
+      CLEAN_ALL=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: $0 --repo <git-url> [options]"
       echo "       $0 --session <name>  (resume existing session)"
@@ -61,6 +66,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --port PORT       Port for Flutter web server (default: 8080)"
       echo "  --session NAME    Named session (creates new or resumes existing)"
       echo "  --list-sessions   List available sessions to resume"
+      echo "  --clean-all       Reset all state (sessions, repos, orchestration, workers)"
       echo ""
       echo "Examples:"
       echo "  $0 --repo git@github.com:user/app.git                    # Fresh start (no session)"
@@ -85,6 +91,47 @@ if [ "$LIST_SESSIONS" = true ]; then
   done || echo "  (no sessions found)"
   echo ""
   echo "To resume: $0 --repo <url> --session <name>"
+  exit 0
+fi
+
+# Handle clean-all command (doesn't require --repo)
+if [ "$CLEAN_ALL" = true ]; then
+  echo "Resetting all state..."
+  echo ""
+
+  # Stop and remove manager container
+  if docker ps -q --filter "name=claude-manager" 2>/dev/null | grep -q .; then
+    echo "Stopping manager container..."
+    docker rm -f claude-manager 2>/dev/null || true
+  fi
+
+  # Stop and remove any worker containers
+  WORKERS=$(docker ps -aq --filter "name=worker-" 2>/dev/null || true)
+  if [ -n "$WORKERS" ]; then
+    echo "Stopping worker containers..."
+    docker rm -f $WORKERS 2>/dev/null || true
+  fi
+
+  # Remove orchestration volume
+  echo "Removing orchestration volume..."
+  docker volume rm orchestration-volume 2>/dev/null || true
+
+  # Remove sessions volume
+  echo "Removing sessions volume..."
+  docker volume rm claude-sessions 2>/dev/null || true
+
+  # Remove all per-session repo volumes
+  echo "Removing repo volumes..."
+  docker volume ls -q --filter "name=claude-repo-" 2>/dev/null | while read vol; do
+    docker volume rm "$vol" 2>/dev/null || true
+  done
+
+  echo ""
+  echo "Done. All state has been reset:"
+  echo "  ✓ Manager and worker containers removed"
+  echo "  ✓ Orchestration volume removed"
+  echo "  ✓ Sessions volume removed"
+  echo "  ✓ Repo volumes removed"
   exit 0
 fi
 
