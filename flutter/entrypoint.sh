@@ -89,15 +89,36 @@ if [ "$WORKER_MODE" = "true" ]; then
   # Extract prompt from task file
   PROMPT=$(jq -r '.prompt' "$TASK_FILE")
 
+  STATUS_FILE="/orchestration/status/worker-${TASK_ID}.json"
+  STARTED_AT="$(date -Iseconds)"
+
   # Write initial status
-  cat > "/orchestration/status/worker-${TASK_ID}.json" << EOF
+  cat > "$STATUS_FILE" << EOF
 {
   "worker_id": "worker-${TASK_ID}",
   "task_id": "$TASK_ID",
   "status": "running",
-  "started_at": "$(date -Iseconds)"
+  "started_at": "$STARTED_AT",
+  "last_heartbeat": "$STARTED_AT"
 }
 EOF
+
+  # Start heartbeat process in background (updates every 30 seconds)
+  (
+    while true; do
+      sleep 30
+      if [ -f "$STATUS_FILE" ]; then
+        # Update heartbeat timestamp
+        HEARTBEAT="$(date -Iseconds)"
+        jq --arg hb "$HEARTBEAT" '.last_heartbeat = $hb' "$STATUS_FILE" > "${STATUS_FILE}.tmp" 2>/dev/null \
+          && mv "${STATUS_FILE}.tmp" "$STATUS_FILE" 2>/dev/null || true
+      else
+        # Status file gone, stop heartbeat
+        break
+      fi
+    done
+  ) &
+  HEARTBEAT_PID=$!
 
   # Run Claude headlessly and capture output
   echo "Running Claude with prompt..."
@@ -105,6 +126,9 @@ EOF
   OUTPUT=$(claude -p "$PROMPT" --dangerously-skip-permissions 2>&1)
   EXIT_CODE=$?
   set -e
+
+  # Stop heartbeat process
+  kill $HEARTBEAT_PID 2>/dev/null || true
 
   # Determine status based on exit code
   if [ $EXIT_CODE -eq 0 ]; then
@@ -145,13 +169,16 @@ EOF
       completed_at: $completed_at
     }' > "$RESULT_FILE"
 
-  # Update status file
-  cat > "/orchestration/status/worker-${TASK_ID}.json" << EOF
+  # Update status file with completion info
+  COMPLETED_AT="$(date -Iseconds)"
+  cat > "$STATUS_FILE" << EOF
 {
   "worker_id": "worker-${TASK_ID}",
   "task_id": "$TASK_ID",
   "status": "$STATUS",
-  "completed_at": "$(date -Iseconds)"
+  "started_at": "$STARTED_AT",
+  "completed_at": "$COMPLETED_AT",
+  "last_heartbeat": "$COMPLETED_AT"
 }
 EOF
 

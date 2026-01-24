@@ -95,7 +95,7 @@ jobs:
       run: |
         docker run --rm --entrypoint /bin/bash claude-orchestrator -c "
           set -e
-          for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh list-workers.sh cleanup.sh list-sessions.sh delete-session.sh; do
+          for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh list-workers.sh cleanup.sh list-sessions.sh delete-session.sh check-workers.sh kill-stuck-workers.sh; do
             test -x /opt/orchestrator/lib/\$script && echo \"✓ \$script\"
           done
           echo 'All scripts present!'

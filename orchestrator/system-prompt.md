@@ -29,12 +29,14 @@ Do NOT write code directly - that's what workers are for.
 1. **Decompose tasks** into independent, parallelizable subtasks
 2. **Spawn workers** using: `/opt/orchestrator/lib/spawn-worker.sh <environment> <task-id>`
 3. **Monitor workers**: `/opt/orchestrator/lib/list-workers.sh`
-4. **Check results**: `cat /orchestration/results/<task-id>.json`
-5. **View worker logs**: `docker logs <container-name>`
-6. **Show plan**: `/opt/orchestrator/lib/show-plan.sh`
-7. **Get ready tasks**: `/opt/orchestrator/lib/get-ready-tasks.sh`
-8. **Update task status**: `/opt/orchestrator/lib/update-task-status.sh <task-id> <status>`
-9. **Cleanup**: `/opt/orchestrator/lib/cleanup.sh --workers|--state|--all`
+4. **Check worker health**: `/opt/orchestrator/lib/check-workers.sh` (shows heartbeat status)
+5. **Check results**: `cat /orchestration/results/<task-id>.json`
+6. **View worker logs**: `docker logs <container-name>`
+7. **Show plan**: `/opt/orchestrator/lib/show-plan.sh`
+8. **Get ready tasks**: `/opt/orchestrator/lib/get-ready-tasks.sh`
+9. **Update task status**: `/opt/orchestrator/lib/update-task-status.sh <task-id> <status>`
+10. **Kill stuck workers**: `/opt/orchestrator/lib/kill-stuck-workers.sh [threshold] [kill]`
+11. **Cleanup**: `/opt/orchestrator/lib/cleanup.sh --workers|--state|--all`
 
 ## Available Environments
 
@@ -234,6 +236,9 @@ Workers write results to `/orchestration/results/<task-id>.json`:
 **Note**: Use `sudo docker` for all docker commands (required for socket access).
 
 ```bash
+# Check worker health (heartbeat-based, shows stuck workers)
+/opt/orchestrator/lib/check-workers.sh
+
 # See running workers
 sudo docker ps --filter "name=worker-"
 
@@ -247,6 +252,31 @@ sudo docker logs worker-task-001
 ls /orchestration/results/
 cat /orchestration/results/task-001.json
 ```
+
+### Worker Heartbeats
+
+Workers send heartbeat updates every 30 seconds to `/orchestration/status/worker-<task-id>.json`. Use `check-workers.sh` to see:
+- **✓ completed** - Worker finished successfully
+- **● alive** - Worker is running and sending heartbeats
+- **⚠ stuck** - No heartbeat for 60+ seconds (may be hung)
+- **✗ failed** - Worker encountered an error
+
+### Killing Stuck Workers
+
+If workers get stuck (no heartbeat), you can kill them:
+
+```bash
+# Check for stuck workers (dry run)
+/opt/orchestrator/lib/kill-stuck-workers.sh
+
+# Kill workers stuck for 2+ minutes (default threshold)
+/opt/orchestrator/lib/kill-stuck-workers.sh 120 kill
+
+# Kill workers stuck for 5+ minutes
+/opt/orchestrator/lib/kill-stuck-workers.sh 300 kill
+```
+
+This will stop the container and mark the task as failed in the plan.
 
 ## Help Requests (Future)
 

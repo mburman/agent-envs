@@ -86,7 +86,7 @@ docker run --rm --entrypoint /bin/bash claude-flutter -c "which jq" > /dev/null 
 # ------------------------------
 info "Checking orchestrator scripts..."
 
-for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh list-workers.sh cleanup.sh list-sessions.sh delete-session.sh; do
+for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh list-workers.sh cleanup.sh list-sessions.sh delete-session.sh check-workers.sh kill-stuck-workers.sh; do
   docker run --rm --entrypoint /bin/bash claude-orchestrator -c "test -x /opt/orchestrator/lib/$script" \
     && pass "Script $script exists and is executable" \
     || fail "Script $script missing or not executable"
