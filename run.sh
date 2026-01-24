@@ -144,8 +144,10 @@ fi
 # Build docker args
 DOCKER_ARGS=(
   -it
+  --init
   --name claude-manager
   --group-add "$DOCKER_GID"
+  -e TERM="${TERM:-xterm-256color}"
   -p "${WEB_PORT}:${WEB_PORT}"
   -e REPO_URL="$REPO_URL"
   -e REPO_BRANCH="$REPO_BRANCH"

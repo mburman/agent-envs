@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y \
     jq \
     ca-certificates \
     gnupg \
+    ncurses-bin \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Docker CLI (NOT the daemon - we'll use host's Docker via socket)
@@ -85,6 +86,8 @@ WORKDIR /app
 
 ENV REPO_URL=""
 ENV REPO_BRANCH="main"
+# Ensure proper terminal handling for Claude Code's rich UI
+ENV TERM=xterm-256color
 
 USER dev
 
