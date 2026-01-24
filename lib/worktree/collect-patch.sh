@@ -34,22 +34,33 @@ UNTRACKED_FILES=$(git ls-files --others --exclude-standard | head -20 || true)
 DELETED_FILES=$(git status --porcelain | grep -E '^.D|^D' | awk '{print $2}' | head -20 || true)
 
 # Stage all changes and generate patch
-git add -A 2>/dev/null || true
+PATCH_FILE="${RESULTS_DIR}/${TASK_ID}.patch"
+ERROR_MSG=""
+
+if ! git add -A 2>&1; then
+  ERROR_MSG="Failed to stage changes"
+fi
 
 # Generate patch from staged changes (use absolute path)
-PATCH_FILE="${RESULTS_DIR}/${TASK_ID}.patch"
-git diff --cached > "$PATCH_FILE" 2>/dev/null || true
+if [ -z "$ERROR_MSG" ]; then
+  if ! git diff --cached > "$PATCH_FILE" 2>&1; then
+    ERROR_MSG="Failed to generate patch"
+  fi
+fi
 
 # Reset staging (don't leave worktree in staged state)
-git reset HEAD 2>/dev/null || true
+git reset HEAD >/dev/null 2>&1 || true
 
 # Return to original directory
 cd "$ORIG_DIR"
 
-# Check if patch has content
-if [ ! -s "$PATCH_FILE" ]; then
+# Determine status
+if [ -n "$ERROR_MSG" ]; then
+  STATUS="error"
+  echo "Error: $ERROR_MSG" >&2
+elif [ ! -s "$PATCH_FILE" ]; then
   STATUS="no_changes"
-  echo "Warning: No changes detected in worktree"
+  echo "No changes detected in worktree"
 else
   STATUS="success"
   PATCH_SIZE=$(wc -c < "$PATCH_FILE" | tr -d ' ')
@@ -62,6 +73,7 @@ cat > "$RESULT_FILE" << EOF
 {
   "task_id": "$TASK_ID",
   "status": "$STATUS",
+  "error": "$ERROR_MSG",
   "patch_file": "$PATCH_FILE",
   "modified_files": "$(echo "$MODIFIED_FILES" | tr '\n' ' ')",
   "untracked_files": "$(echo "$UNTRACKED_FILES" | tr '\n' ' ')",

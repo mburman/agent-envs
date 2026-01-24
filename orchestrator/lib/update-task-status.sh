@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # Update a task's status in the plan
 # Usage: update-task-status.sh <task-id> <status>
 

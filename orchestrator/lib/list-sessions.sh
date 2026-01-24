@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # List available named sessions
 
 SESSIONS_DIR="/home/dev/.claude-sessions"

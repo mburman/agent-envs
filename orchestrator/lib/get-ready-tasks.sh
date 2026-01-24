@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # Get tasks that are ready to run (pending with all dependencies completed)
 # Usage: get-ready-tasks.sh
 

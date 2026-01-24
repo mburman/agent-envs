@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # Check status and progress of all workers (sub-agents in worktrees)
 # Usage: check-workers.sh [stale-threshold-seconds]
 
@@ -27,6 +28,12 @@ NOW=$(date +%s)
 for status_file in "$STATUS_DIR"/worker-*.json; do
   [ -f "$status_file" ] || continue
 
+  # Validate JSON before parsing
+  if ! jq empty "$status_file" 2>/dev/null; then
+    echo "⚠ $(basename "$status_file"): invalid JSON, skipping"
+    continue
+  fi
+
   TASK_ID=$(jq -r '.task_id' "$status_file")
   STATUS=$(jq -r '.status' "$status_file")
   STARTED=$(jq -r '.started_at // empty' "$status_file")
@@ -37,11 +44,14 @@ for status_file in "$STATUS_DIR"/worker-*.json; do
   # Check if result file exists (indicates completion)
   RESULT_FILE="${RESULTS_DIR}/${TASK_ID}.json"
   if [ -f "$RESULT_FILE" ]; then
-    RESULT_STATUS=$(jq -r '.status // "unknown"' "$RESULT_FILE")
-    if [ "$RESULT_STATUS" = "success" ] || [ "$RESULT_STATUS" = "no_changes" ]; then
-      STATUS="completed"
-    elif [ "$RESULT_STATUS" = "error" ]; then
-      STATUS="failed"
+    # Validate result JSON before parsing
+    if jq empty "$RESULT_FILE" 2>/dev/null; then
+      RESULT_STATUS=$(jq -r '.status // "unknown"' "$RESULT_FILE")
+      if [ "$RESULT_STATUS" = "success" ] || [ "$RESULT_STATUS" = "no_changes" ]; then
+        STATUS="completed"
+      elif [ "$RESULT_STATUS" = "error" ]; then
+        STATUS="failed"
+      fi
     fi
   fi
 
@@ -51,29 +61,45 @@ for status_file in "$STATUS_DIR"/worker-*.json; do
     WORKTREE_EXISTS=true
   fi
 
+  # Parse ISO 8601 timestamp to epoch seconds (works on GNU and BSD)
+  parse_timestamp() {
+    local ts="$1"
+    # Try GNU date
+    date -d "$ts" +%s 2>/dev/null && return
+    # Try BSD date
+    date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null && return
+    # Try BSD date with timezone offset format
+    date -j -f "%Y-%m-%dT%H:%M:%S%z" "$ts" +%s 2>/dev/null && return
+    # Return empty on failure
+    echo ""
+  }
+
   # Calculate time since last activity
   if [ -n "$LAST_ACTIVITY" ]; then
-    # Try GNU date first, then BSD date
-    ACTIVITY_TS=$(date -d "$LAST_ACTIVITY" +%s 2>/dev/null || \
-                  date -j -f "%Y-%m-%dT%H:%M:%SZ" "$LAST_ACTIVITY" +%s 2>/dev/null || \
-                  echo "$NOW")
-    SINCE_ACTIVITY=$((NOW - ACTIVITY_TS))
+    ACTIVITY_TS=$(parse_timestamp "$LAST_ACTIVITY")
+    if [ -n "$ACTIVITY_TS" ]; then
+      SINCE_ACTIVITY=$((NOW - ACTIVITY_TS))
+    else
+      SINCE_ACTIVITY=999999  # Unknown, treat as stale
+    fi
   else
     SINCE_ACTIVITY=999999
   fi
 
   # Calculate duration
   if [ -n "$STARTED" ]; then
-    STARTED_TS=$(date -d "$STARTED" +%s 2>/dev/null || \
-                 date -j -f "%Y-%m-%dT%H:%M:%SZ" "$STARTED" +%s 2>/dev/null || \
-                 echo "$NOW")
-    DURATION=$((NOW - STARTED_TS))
-    if [ "$DURATION" -ge 3600 ]; then
-      DURATION_STR="$((DURATION / 3600))h $((DURATION % 3600 / 60))m"
-    elif [ "$DURATION" -ge 60 ]; then
-      DURATION_STR="$((DURATION / 60))m $((DURATION % 60))s"
+    STARTED_TS=$(parse_timestamp "$STARTED")
+    if [ -n "$STARTED_TS" ]; then
+      DURATION=$((NOW - STARTED_TS))
+      if [ "$DURATION" -ge 3600 ]; then
+        DURATION_STR="$((DURATION / 3600))h $((DURATION % 3600 / 60))m"
+      elif [ "$DURATION" -ge 60 ]; then
+        DURATION_STR="$((DURATION / 60))m $((DURATION % 60))s"
+      else
+        DURATION_STR="${DURATION}s"
+      fi
     else
-      DURATION_STR="${DURATION}s"
+      DURATION_STR="unknown"
     fi
   else
     DURATION_STR="unknown"
@@ -107,7 +133,7 @@ for status_file in "$STATUS_DIR"/worker-*.json; do
   echo "$INDICATOR $TASK_ID: $STATUS_STR"
 
   # Show additional info for running/stuck workers
-  if [ "$STATUS" = "running" ] || [ "$STATUS" = "pending" ]; then
+  if [[ "$STATUS_STR" == running* ]] || [[ "$STATUS_STR" == *stuck* ]]; then
     if [ "$WORKTREE_EXISTS" = true ]; then
       echo "  ├─ Worktree: $WORKTREE"
       echo "  ├─ Last activity: ${SINCE_ACTIVITY}s ago"

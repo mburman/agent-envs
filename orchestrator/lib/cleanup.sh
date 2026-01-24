@@ -71,7 +71,6 @@ if [ "$CLEAN_STATE" = true ]; then
   rm -f "${ORCHESTRATION_DIR}/tasks/"*.json 2>/dev/null || true
   rm -f "${ORCHESTRATION_DIR}/results/"*.json "${ORCHESTRATION_DIR}/results/"*.patch 2>/dev/null || true
   rm -f "${ORCHESTRATION_DIR}/status/"*.json 2>/dev/null || true
-  rm -f "${ORCHESTRATION_DIR}/help-requests/"*.json 2>/dev/null || true
   echo "State cleared."
 fi
 

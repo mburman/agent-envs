@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # Delete a named session
 
 SESSION_NAME="$1"

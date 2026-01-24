@@ -75,10 +75,11 @@ RUN mkdir -p /home/dev/.ssh \
 RUN mkdir -p /home/dev/.config/claude-code /home/dev/.claude /home/dev/.claude-sessions \
     && chown -R dev:dev /home/dev/.config /home/dev/.claude /home/dev/.claude-sessions
 
-# Copy orchestrator files
-COPY entrypoint.sh /entrypoint.sh
-COPY system-prompt.md /opt/orchestrator/system-prompt.md
-COPY lib/ /opt/orchestrator/lib/
+# Copy orchestrator files (build context is repo root)
+COPY orchestrator/entrypoint.sh /entrypoint.sh
+COPY orchestrator/system-prompt.md /opt/orchestrator/system-prompt.md
+COPY orchestrator/lib/ /opt/orchestrator/lib/
+COPY lib/worktree/ /opt/orchestrator/lib/worktree/
 RUN chmod +x /entrypoint.sh /opt/orchestrator/lib/*.sh /opt/orchestrator/lib/worktree/*.sh
 
 WORKDIR /app

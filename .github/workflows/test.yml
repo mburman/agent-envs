@@ -20,8 +20,7 @@ jobs:
 
     - name: Build Orchestrator image
       run: |
-        cd orchestrator
-        docker build -t claude-orchestrator .
+        docker build -t claude-orchestrator -f orchestrator/Dockerfile .
 
     - name: Test Orchestrator tools
       run: |
@@ -155,7 +154,7 @@ jobs:
 
     - name: Build image
       run: |
-        docker build -t claude-orchestrator orchestrator/
+        docker build -t claude-orchestrator -f orchestrator/Dockerfile .
 
     - name: Test sudo docker access
       run: |

@@ -10,7 +10,7 @@ if [ -n "$GIT_USER_EMAIL" ]; then
 fi
 
 # Initialize orchestration directories (on shared volume)
-mkdir -p /orchestration/tasks /orchestration/results /orchestration/status /orchestration/help-requests
+mkdir -p /orchestration/tasks /orchestration/results /orchestration/status
 
 # Check if we're resuming a session with existing repo
 SKIP_CLONE=false

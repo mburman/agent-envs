@@ -38,26 +38,30 @@ git branch "$BRANCH_NAME" HEAD 2>/dev/null || true
 git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
 
 # Install git hooks to block commits/pushes in the worktree
-# Note: Worktrees share the main .git directory, so we need to create
-# a hooks directory in the worktree's gitdir
+# Git worktrees share the main .git/hooks by default. We need to use
+# core.hooksPath to point to worktree-specific hooks.
 WORKTREE_GIT_DIR=$(git -C "$WORKTREE_DIR" rev-parse --git-dir)
-mkdir -p "${WORKTREE_GIT_DIR}/hooks"
+HOOKS_DIR="${WORKTREE_GIT_DIR}/hooks"
+mkdir -p "$HOOKS_DIR"
 
-cat > "${WORKTREE_GIT_DIR}/hooks/pre-commit" << 'HOOK'
+cat > "${HOOKS_DIR}/pre-commit" << 'HOOK'
 #!/bin/bash
 echo "ERROR: Workers cannot commit. The Manager will review and commit your changes."
 echo "Your changes are saved in the working directory."
 exit 1
 HOOK
 
-cat > "${WORKTREE_GIT_DIR}/hooks/pre-push" << 'HOOK'
+cat > "${HOOKS_DIR}/pre-push" << 'HOOK'
 #!/bin/bash
 echo "ERROR: Workers cannot push. Only the Manager can push code."
 exit 1
 HOOK
 
-chmod +x "${WORKTREE_GIT_DIR}/hooks/pre-commit"
-chmod +x "${WORKTREE_GIT_DIR}/hooks/pre-push"
+chmod +x "${HOOKS_DIR}/pre-commit"
+chmod +x "${HOOKS_DIR}/pre-push"
+
+# Configure the worktree to use its own hooks directory
+git -C "$WORKTREE_DIR" config core.hooksPath "$HOOKS_DIR"
 
 echo "Created worktree: $WORKTREE_DIR (branch: $BRANCH_NAME)"
 echo "Git hooks installed to block commit/push"

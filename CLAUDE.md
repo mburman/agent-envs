@@ -10,9 +10,9 @@ agent-envs/
 ├── CLAUDE.md              # This file
 ├── build.sh               # Build all images
 ├── run.sh                 # Start the Manager
-├── test.sh                # Run tests
+├── test.sh                # Run tests (includes functional worktree tests)
 ├── lib/
-│   └── worktree/          # Worktree management scripts (source)
+│   └── worktree/          # Worktree management scripts
 │       ├── create-worktree.sh
 │       ├── collect-patch.sh
 │       ├── cleanup-worktree.sh
@@ -25,14 +25,13 @@ agent-envs/
     ├── entrypoint.sh      # Clones repo, starts Claude with system prompt
     ├── system-prompt.md   # Manager orchestration instructions
     ├── README.md
-    └── lib/               # Orchestration scripts
-        ├── spawn-worker.sh    # Create worktree + instructions
-        ├── check-workers.sh   # Monitor sub-agents
+    └── lib/               # Orchestration scripts (worktree/ copied from lib/)
+        ├── spawn-worker.sh
+        ├── check-workers.sh
         ├── show-plan.sh
         ├── get-ready-tasks.sh
         ├── update-task-status.sh
-        ├── cleanup.sh
-        └── worktree/          # Worktree scripts (copied from lib/)
+        └── cleanup.sh
 ```
 
 ## Orchestration System

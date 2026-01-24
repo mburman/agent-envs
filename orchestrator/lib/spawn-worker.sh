@@ -82,7 +82,9 @@ fi
 # Update plan status to running (if plan exists)
 PLAN_FILE="${ORCHESTRATION_DIR}/plan.json"
 if [ -f "$PLAN_FILE" ]; then
-  /opt/orchestrator/lib/update-task-status.sh "$TASK_ID" running 2>/dev/null || true
+  if ! /opt/orchestrator/lib/update-task-status.sh "$TASK_ID" running 2>&1; then
+    echo "Warning: Failed to update plan status (lock timeout or plan error)" >&2
+  fi
 fi
 
 # Write status file

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # Display the task dependency graph and current progress
 # Usage: show-plan.sh
 

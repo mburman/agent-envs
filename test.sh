@@ -32,7 +32,7 @@ echo ""
 if [ "$SKIP_BUILD" = false ]; then
   info "Building images..."
 
-  docker build -t claude-orchestrator orchestrator/ > /dev/null 2>&1 \
+  docker build -t claude-orchestrator -f orchestrator/Dockerfile . > /dev/null 2>&1 \
     && pass "Built claude-orchestrator" \
     || fail "Failed to build claude-orchestrator"
 else
@@ -282,6 +282,195 @@ if echo "$TEST_OUTPUT" | grep -q "CREATE" && echo "$TEST_OUTPUT" | grep -q "SESS
   pass "SESSION_NAME creates new session directory"
 else
   fail "SESSION_NAME should create session directory"
+fi
+
+# ------------------------------
+# Test 11: Functional worktree tests
+# ------------------------------
+info "Testing worktree operations..."
+
+# Test create-worktree.sh creates worktree with hooks
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  # Initialize a git repo to work with
+  mkdir -p /app && cd /app
+  git init --initial-branch main
+  git config user.email "test@test.com"
+  git config user.name "Test"
+  echo "initial" > file.txt
+  git add file.txt
+  git commit -m "initial"
+
+  # Create worktree
+  /opt/orchestrator/lib/worktree/create-worktree.sh task-001
+
+  # Check worktree exists
+  test -d .worktrees/task-001 && echo "WORKTREE_EXISTS"
+
+  # Check hooks exist
+  GITDIR=$(git -C .worktrees/task-001 rev-parse --git-dir)
+  test -x "${GITDIR}/hooks/pre-commit" && echo "PRECOMMIT_EXISTS"
+  test -x "${GITDIR}/hooks/pre-push" && echo "PREPUSH_EXISTS"
+
+  # Check hooks block commit
+  cd .worktrees/task-001
+  echo "change" > newfile.txt
+  git add newfile.txt
+  git commit -m "test" 2>&1 | grep -q "cannot commit" && echo "COMMIT_BLOCKED"
+')
+
+if echo "$TEST_OUTPUT" | grep -q "WORKTREE_EXISTS"; then
+  pass "create-worktree.sh creates worktree directory"
+else
+  fail "create-worktree.sh should create worktree"
+fi
+
+if echo "$TEST_OUTPUT" | grep -q "PRECOMMIT_EXISTS" && echo "$TEST_OUTPUT" | grep -q "PREPUSH_EXISTS"; then
+  pass "create-worktree.sh installs git hooks"
+else
+  fail "create-worktree.sh should install git hooks"
+fi
+
+if echo "$TEST_OUTPUT" | grep -q "COMMIT_BLOCKED"; then
+  pass "Git hooks block commits in worktree"
+else
+  fail "Git hooks should block commits in worktree"
+fi
+
+# Test collect-patch.sh generates patch
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  # Initialize a git repo
+  mkdir -p /app && cd /app
+  git init --initial-branch main
+  git config user.email "test@test.com"
+  git config user.name "Test"
+  echo "initial" > file.txt
+  git add file.txt
+  git commit -m "initial"
+
+  # Create worktree
+  /opt/orchestrator/lib/worktree/create-worktree.sh task-002
+
+  # Make changes in worktree
+  cd .worktrees/task-002
+  echo "modified" > file.txt
+  echo "new content" > newfile.txt
+  cd /app
+
+  # Collect patch
+  /opt/orchestrator/lib/worktree/collect-patch.sh task-002
+
+  # Check result
+  test -f /orchestration/results/task-002.patch && echo "PATCH_EXISTS"
+  test -s /orchestration/results/task-002.patch && echo "PATCH_NOT_EMPTY"
+  test -f /orchestration/results/task-002.json && echo "RESULT_JSON_EXISTS"
+  cat /orchestration/results/task-002.json | jq -r ".status" | grep -q "success" && echo "STATUS_SUCCESS"
+')
+
+if echo "$TEST_OUTPUT" | grep -q "PATCH_EXISTS" && echo "$TEST_OUTPUT" | grep -q "PATCH_NOT_EMPTY"; then
+  pass "collect-patch.sh generates patch file"
+else
+  fail "collect-patch.sh should generate non-empty patch"
+fi
+
+if echo "$TEST_OUTPUT" | grep -q "RESULT_JSON_EXISTS" && echo "$TEST_OUTPUT" | grep -q "STATUS_SUCCESS"; then
+  pass "collect-patch.sh writes result JSON with success status"
+else
+  fail "collect-patch.sh should write result JSON"
+fi
+
+# Test collect-patch.sh returns no_changes when no changes
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  # Initialize a git repo
+  mkdir -p /app && cd /app
+  git init --initial-branch main
+  git config user.email "test@test.com"
+  git config user.name "Test"
+  echo "initial" > file.txt
+  git add file.txt
+  git commit -m "initial"
+
+  # Create worktree (no changes)
+  /opt/orchestrator/lib/worktree/create-worktree.sh task-003
+
+  # Collect patch without making changes
+  /opt/orchestrator/lib/worktree/collect-patch.sh task-003
+
+  # Check result
+  cat /orchestration/results/task-003.json | jq -r ".status"
+')
+
+if echo "$TEST_OUTPUT" | grep -q "no_changes"; then
+  pass "collect-patch.sh detects no changes correctly"
+else
+  fail "collect-patch.sh should return no_changes when worktree unchanged"
+fi
+
+# Test cleanup-worktree.sh removes worktree
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  # Initialize a git repo
+  mkdir -p /app && cd /app
+  git init --initial-branch main
+  git config user.email "test@test.com"
+  git config user.name "Test"
+  echo "initial" > file.txt
+  git add file.txt
+  git commit -m "initial"
+
+  # Create worktree
+  /opt/orchestrator/lib/worktree/create-worktree.sh task-004
+  test -d .worktrees/task-004 && echo "WORKTREE_BEFORE"
+
+  # Cleanup worktree
+  /opt/orchestrator/lib/worktree/cleanup-worktree.sh task-004
+
+  # Check worktree removed
+  test -d .worktrees/task-004 && echo "WORKTREE_AFTER" || echo "WORKTREE_REMOVED"
+
+  # Check branch removed
+  git branch | grep -q "worker/task-004" && echo "BRANCH_EXISTS" || echo "BRANCH_REMOVED"
+')
+
+if echo "$TEST_OUTPUT" | grep -q "WORKTREE_BEFORE" && echo "$TEST_OUTPUT" | grep -q "WORKTREE_REMOVED"; then
+  pass "cleanup-worktree.sh removes worktree directory"
+else
+  fail "cleanup-worktree.sh should remove worktree"
+fi
+
+if echo "$TEST_OUTPUT" | grep -q "BRANCH_REMOVED"; then
+  pass "cleanup-worktree.sh removes worker branch"
+else
+  fail "cleanup-worktree.sh should remove worker branch"
+fi
+
+# Test patch can be applied to main repo
+TEST_OUTPUT=$(docker run --rm --entrypoint /bin/bash claude-orchestrator -c '
+  # Initialize a git repo
+  mkdir -p /app && cd /app
+  git init --initial-branch main
+  git config user.email "test@test.com"
+  git config user.name "Test"
+  echo "initial" > file.txt
+  git add file.txt
+  git commit -m "initial"
+
+  # Create worktree and make changes
+  /opt/orchestrator/lib/worktree/create-worktree.sh task-005
+  echo "modified by worker" > .worktrees/task-005/file.txt
+
+  # Collect patch
+  /opt/orchestrator/lib/worktree/collect-patch.sh task-005
+
+  # Apply patch to main repo
+  git apply /orchestration/results/task-005.patch 2>&1 && echo "PATCH_APPLIED"
+
+  # Verify change
+  cat file.txt | grep -q "modified by worker" && echo "CHANGE_VERIFIED"
+')
+
+if echo "$TEST_OUTPUT" | grep -q "PATCH_APPLIED" && echo "$TEST_OUTPUT" | grep -q "CHANGE_VERIFIED"; then
+  pass "Collected patch can be applied to main repo"
+else
+  fail "Patch should be applicable to main repo"
 fi
 
 # ------------------------------
