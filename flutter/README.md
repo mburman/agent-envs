@@ -21,7 +21,7 @@ docker build -t claude-flutter .
 # Run with your Flutter repo
 docker run -it --rm \
   -e REPO_URL="git@github.com:your-username/your-flutter-repo.git" \
-  -e ANTHROPIC_AUTH_TOKEN="$(cat ~/.claude-token)" \
+  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token)" \
   -v ~/.ssh/id_ed25519:/home/dev/.ssh/id_ed25519:ro \
   claude-flutter
 ```
@@ -52,7 +52,7 @@ chmod 600 ~/.claude-token
 ```bash
 docker run -it --rm \
   -e REPO_URL="git@github.com:user/my-flutter-app.git" \
-  -e ANTHROPIC_AUTH_TOKEN="$(cat ~/.claude-token)" \
+  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token)" \
   -v ~/.ssh/id_ed25519:/home/dev/.ssh/id_ed25519:ro \
   claude-flutter
 ```
@@ -62,7 +62,7 @@ docker run -it --rm \
 docker run -it --rm \
   -e REPO_URL="git@github.com:user/my-flutter-app.git" \
   -e REPO_BRANCH="feature/new-feature" \
-  -e ANTHROPIC_AUTH_TOKEN="$(cat ~/.claude-token)" \
+  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token)" \
   -v ~/.ssh/id_ed25519:/home/dev/.ssh/id_ed25519:ro \
   claude-flutter
 ```
@@ -71,7 +71,7 @@ docker run -it --rm \
 ```bash
 docker run -it --rm \
   -e REPO_URL="git@github.com:user/my-flutter-app.git" \
-  -e ANTHROPIC_AUTH_TOKEN="$(cat ~/.claude-token)" \
+  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token)" \
   -v ~/.ssh/id_ed25519:/home/dev/.ssh/id_ed25519:ro \
   -v flutter-pub-cache:/root/.pub-cache \
   claude-flutter

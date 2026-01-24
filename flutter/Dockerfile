@@ -51,6 +51,10 @@ RUN mkdir -p /home/dev/.ssh \
     && chown -R dev:dev /home/dev/.ssh \
     && chmod 700 /home/dev/.ssh
 
+# Prepare Claude config directory
+RUN mkdir -p /home/dev/.config/claude-code \
+    && chown -R dev:dev /home/dev/.config
+
 WORKDIR /app
 
 ENV REPO_URL=""

@@ -39,7 +39,7 @@ docker build -t claude-flutter .
 # Run with your repo
 docker run -it --rm \
   -e REPO_URL="git@github.com:your-username/your-repo.git" \
-  -e ANTHROPIC_AUTH_TOKEN="$(cat ~/.claude-token)" \
+  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token)" \
   -v ~/.ssh/id_ed25519:/home/dev/.ssh/id_ed25519:ro \
   claude-flutter
 ```

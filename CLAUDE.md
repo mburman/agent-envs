@@ -62,7 +62,7 @@ exec claude --dangerously-skip-permissions "$@"
 
 ## Authentication
 
-Claude Code uses a long-lived token passed via `ANTHROPIC_AUTH_TOKEN` environment variable.
+Claude Code uses a long-lived token passed via `CLAUDE_CODE_OAUTH_TOKEN` environment variable.
 
 ```bash
 # Get a token (one-time):
@@ -73,7 +73,7 @@ echo "your-token-here" > ~/.claude-token
 chmod 600 ~/.claude-token
 
 # Pass to container:
--e ANTHROPIC_AUTH_TOKEN="$(cat ~/.claude-token)"
+-e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token)"
 ```
 
 ## Environment Variables (All Environments)
@@ -93,7 +93,7 @@ docker build -t claude-flutter .
 # Test it
 docker run -it --rm \
   -e REPO_URL="git@github.com:user/test-repo.git" \
-  -e ANTHROPIC_AUTH_TOKEN="$(cat ~/.claude-token)" \
+  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token)" \
   -v ~/.ssh/id_ed25519:/home/dev/.ssh/id_ed25519:ro \
   claude-flutter
 ```
