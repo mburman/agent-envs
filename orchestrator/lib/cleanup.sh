@@ -25,9 +25,9 @@ done
 
 if [ "$CLEAN_WORKERS" = true ]; then
   echo "Stopping worker containers..."
-  WORKERS=$(sudo docker ps -aq --filter "name=worker-" 2>/dev/null)
+  WORKERS=$(sudo /usr/bin/docker ps -aq --filter "name=worker-" 2>/dev/null)
   if [ -n "$WORKERS" ]; then
-    sudo docker rm -f $WORKERS
+    sudo /usr/bin/docker rm -f $WORKERS
     echo "Removed workers."
   else
     echo "No workers running."

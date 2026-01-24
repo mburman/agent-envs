@@ -47,7 +47,7 @@ for status_file in "$STATUS_DIR"/worker-*.json; do
 
     if [ "$DRY_RUN" = "kill" ]; then
       echo "  → Killing container: $CONTAINER_NAME"
-      sudo docker kill "$CONTAINER_NAME" 2>/dev/null || echo "  → Container not running"
+      sudo /usr/bin/docker kill "$CONTAINER_NAME" 2>/dev/null || echo "  → Container not running"
 
       # Update status to failed
       cat > "$status_file" << EOF
@@ -71,7 +71,7 @@ EOF
         ) 200>"$LOCK_FILE"
       fi
     else
-      echo "  → Would kill: sudo docker kill $CONTAINER_NAME"
+      echo "  → Would kill: sudo /usr/bin/docker kill $CONTAINER_NAME"
     fi
   fi
 done

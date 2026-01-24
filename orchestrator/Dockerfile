@@ -53,11 +53,11 @@ RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME \
 # Install Claude Code globally
 RUN npm install -g @anthropic-ai/claude-code
 
-# Create non-root user with sudo access for docker
+# Create non-root user with sudo access for docker (via wrapper)
 RUN useradd -m -s /bin/bash dev \
     && mkdir -p /app /orchestration \
     && chown dev:dev /app /orchestration \
-    && echo "dev ALL=(ALL) NOPASSWD: /usr/bin/docker" >> /etc/sudoers.d/dev-docker
+    && echo "dev ALL=(ALL) NOPASSWD: /usr/local/bin/docker, /usr/bin/docker" >> /etc/sudoers.d/dev-docker
 
 # Prepare SSH for dev user
 RUN mkdir -p /home/dev/.ssh \
@@ -75,6 +75,11 @@ COPY start-claude.exp /start-claude.exp
 COPY system-prompt.md /opt/orchestrator/system-prompt.md
 COPY lib/ /opt/orchestrator/lib/
 RUN chmod +x /entrypoint.sh /start-claude.exp /opt/orchestrator/lib/*.sh
+
+# Install docker wrapper to prevent direct worker spawning
+# The wrapper blocks "docker run" for worker-like commands and directs to spawn-worker.sh
+RUN cp /opt/orchestrator/lib/docker-wrapper.sh /usr/local/bin/docker \
+    && chmod +x /usr/local/bin/docker
 
 WORKDIR /app
 

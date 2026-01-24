@@ -6,7 +6,7 @@ echo ""
 echo "Running Workers:"
 echo "────────────────────────────────────────────────────────"
 
-WORKERS=$(sudo docker ps --filter "name=worker-" --format "{{.Names}}\t{{.Status}}\t{{.RunningFor}}" 2>/dev/null)
+WORKERS=$(sudo /usr/bin/docker ps --filter "name=worker-" --format "{{.Names}}\t{{.Status}}\t{{.RunningFor}}" 2>/dev/null)
 
 if [ -z "$WORKERS" ]; then
   echo "  No workers currently running."
@@ -21,7 +21,7 @@ fi
 echo ""
 
 # Also show recently exited workers
-EXITED=$(sudo docker ps -a --filter "name=worker-" --filter "status=exited" --format "{{.Names}}\t{{.Status}}" 2>/dev/null | head -5)
+EXITED=$(sudo /usr/bin/docker ps -a --filter "name=worker-" --filter "status=exited" --format "{{.Names}}\t{{.Status}}" 2>/dev/null | head -5)
 if [ -n "$EXITED" ]; then
   echo "Recently Exited:"
   echo "────────────────────────────────────────────────────────"

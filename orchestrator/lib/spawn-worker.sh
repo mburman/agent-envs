@@ -24,8 +24,11 @@ fi
 # Container name based on task ID
 CONTAINER_NAME="worker-${TASK_ID}"
 
+# Use real docker binary (bypass wrapper)
+DOCKER="/usr/bin/docker"
+
 # Check if container already exists
-if sudo docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+if sudo $DOCKER ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
   echo "Error: Container $CONTAINER_NAME already exists"
   echo "Check status with: docker ps -a --filter name=$CONTAINER_NAME"
   exit 1
@@ -68,7 +71,7 @@ fi
 IMAGE_NAME="claude-${ENVIRONMENT}"
 
 # Run the worker container
-sudo docker run "${DOCKER_ARGS[@]}" "$IMAGE_NAME"
+sudo $DOCKER run "${DOCKER_ARGS[@]}" "$IMAGE_NAME"
 
 echo "Worker spawned: $CONTAINER_NAME"
 echo "Monitor with: docker logs -f $CONTAINER_NAME"
