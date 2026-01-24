@@ -91,13 +91,10 @@ fi
 # Check if session exists (for resuming without --repo)
 SESSION_EXISTS=false
 if [ -n "$SESSION_NAME" ]; then
-  # Check if the session's repo volume exists and has content
-  if docker volume inspect "claude-repo-${SESSION_NAME}" >/dev/null 2>&1; then
-    # Check if volume has a .git directory (repo was cloned)
-    HAS_REPO=$(docker run --rm -v "claude-repo-${SESSION_NAME}:/app" alpine test -d /app/.git && echo "yes" || echo "no")
-    if [ "$HAS_REPO" = "yes" ]; then
-      SESSION_EXISTS=true
-    fi
+  # Check if session directory exists in the sessions volume
+  HAS_SESSION=$(docker run --rm -v claude-sessions:/sessions alpine test -d "/sessions/${SESSION_NAME}" && echo "yes" || echo "no")
+  if [ "$HAS_SESSION" = "yes" ]; then
+    SESSION_EXISTS=true
   fi
 fi
 
