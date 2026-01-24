@@ -1,7 +1,9 @@
 #!/bin/bash
-# Detect and optionally kill stuck workers based on heartbeat timestamps
+# Detect and optionally kill stuck workers based on activity timestamps
+# Note: Workers auto-kill after 5 minutes of inactivity, but this script
+# can be used to manually kill workers earlier.
 
-STALE_THRESHOLD=${1:-120}  # Seconds before considering stuck (default: 2 minutes)
+STALE_THRESHOLD=${1:-180}  # Seconds before considering stuck (default: 3 minutes)
 DRY_RUN=${2:-false}        # Set to "kill" to actually kill workers
 
 STATUS_DIR="/orchestration/status"
@@ -22,28 +24,28 @@ for status_file in "$STATUS_DIR"/worker-*.json; do
 
   TASK_ID=$(jq -r '.task_id' "$status_file")
   STATUS=$(jq -r '.status' "$status_file")
-  HEARTBEAT=$(jq -r '.last_heartbeat // empty' "$status_file")
+  LAST_ACTIVITY=$(jq -r '.last_activity // .last_heartbeat // empty' "$status_file")
 
-  # Skip completed workers
-  if [ "$STATUS" = "success" ] || [ "$STATUS" = "completed" ] || [ "$STATUS" = "error" ] || [ "$STATUS" = "failed" ]; then
+  # Skip completed/failed/timeout workers
+  if [ "$STATUS" = "success" ] || [ "$STATUS" = "completed" ] || [ "$STATUS" = "error" ] || [ "$STATUS" = "failed" ] || [ "$STATUS" = "timeout" ]; then
     continue
   fi
 
-  # Calculate time since last heartbeat
-  if [ -n "$HEARTBEAT" ]; then
+  # Calculate time since last activity
+  if [ -n "$LAST_ACTIVITY" ]; then
     # Try GNU date first, then BSD date
-    HEARTBEAT_TS=$(date -d "$HEARTBEAT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${HEARTBEAT%+*}" +%s 2>/dev/null || echo "0")
-    SINCE_HEARTBEAT=$((NOW - HEARTBEAT_TS))
+    ACTIVITY_TS=$(date -d "$LAST_ACTIVITY" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${LAST_ACTIVITY%+*}" +%s 2>/dev/null || echo "0")
+    SINCE_ACTIVITY=$((NOW - ACTIVITY_TS))
   else
-    SINCE_HEARTBEAT=999999
+    SINCE_ACTIVITY=999999
   fi
 
   # Check if stuck
-  if [ "$SINCE_HEARTBEAT" -gt "$STALE_THRESHOLD" ]; then
+  if [ "$SINCE_ACTIVITY" -gt "$STALE_THRESHOLD" ]; then
     STUCK_COUNT=$((STUCK_COUNT + 1))
     CONTAINER_NAME="worker-${TASK_ID}"
 
-    echo "⚠ STUCK: $TASK_ID (no heartbeat for ${SINCE_HEARTBEAT}s)"
+    echo "⚠ STUCK: $TASK_ID (no heartbeat for ${SINCE_ACTIVITY}s)"
 
     if [ "$DRY_RUN" = "kill" ]; then
       echo "  → Killing container: $CONTAINER_NAME"
@@ -55,7 +57,7 @@ for status_file in "$STATUS_DIR"/worker-*.json; do
   "worker_id": "$CONTAINER_NAME",
   "task_id": "$TASK_ID",
   "status": "failed",
-  "error": "Killed due to no heartbeat for ${SINCE_HEARTBEAT}s",
+  "error": "Killed due to no heartbeat for ${SINCE_ACTIVITY}s",
   "killed_at": "$(date -Iseconds)"
 }
 EOF

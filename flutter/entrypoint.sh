@@ -90,7 +90,9 @@ if [ "$WORKER_MODE" = "true" ]; then
   PROMPT=$(jq -r '.prompt' "$TASK_FILE")
 
   STATUS_FILE="/orchestration/status/worker-${TASK_ID}.json"
+  OUTPUT_FILE="/orchestration/status/worker-${TASK_ID}.output"
   STARTED_AT="$(date -Iseconds)"
+  TIMEOUT_SECONDS=300  # 5 minutes
 
   # Write initial status
   cat > "$STATUS_FILE" << EOF
@@ -99,40 +101,103 @@ if [ "$WORKER_MODE" = "true" ]; then
   "task_id": "$TASK_ID",
   "status": "running",
   "started_at": "$STARTED_AT",
-  "last_heartbeat": "$STARTED_AT"
+  "last_activity": "$STARTED_AT",
+  "progress": "Starting task..."
 }
 EOF
 
-  # Start heartbeat process in background (updates every 30 seconds)
+  # Initialize output file
+  echo "" > "$OUTPUT_FILE"
+  LAST_SIZE=0
+
+  # Start progress monitor in background (checks every 60 seconds)
   (
     while true; do
-      sleep 30
-      if [ -f "$STATUS_FILE" ]; then
-        # Update heartbeat timestamp
-        HEARTBEAT="$(date -Iseconds)"
-        jq --arg hb "$HEARTBEAT" '.last_heartbeat = $hb' "$STATUS_FILE" > "${STATUS_FILE}.tmp" 2>/dev/null \
-          && mv "${STATUS_FILE}.tmp" "$STATUS_FILE" 2>/dev/null || true
+      sleep 60
+
+      if [ ! -f "$STATUS_FILE" ]; then
+        break  # Status file gone, stop monitoring
+      fi
+
+      # Check if output file has grown (activity detected)
+      if [ -f "$OUTPUT_FILE" ]; then
+        CURRENT_SIZE=$(stat -c%s "$OUTPUT_FILE" 2>/dev/null || stat -f%z "$OUTPUT_FILE" 2>/dev/null || echo "0")
       else
-        # Status file gone, stop heartbeat
-        break
+        CURRENT_SIZE=0
+      fi
+
+      NOW=$(date +%s)
+      LAST_ACTIVITY_TS=$(jq -r '.last_activity // empty' "$STATUS_FILE" 2>/dev/null)
+      if [ -n "$LAST_ACTIVITY_TS" ]; then
+        LAST_TS=$(date -d "$LAST_ACTIVITY_TS" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${LAST_ACTIVITY_TS%+*}" +%s 2>/dev/null || echo "$NOW")
+      else
+        LAST_TS=$NOW
+      fi
+
+      if [ "$CURRENT_SIZE" -gt "$LAST_SIZE" ]; then
+        # Activity detected - update progress
+        LAST_SIZE=$CURRENT_SIZE
+        ACTIVITY_TIME="$(date -Iseconds)"
+
+        # Get last meaningful line from output (skip empty lines)
+        LAST_LINE=$(tail -20 "$OUTPUT_FILE" 2>/dev/null | grep -v '^$' | tail -1 | cut -c1-100 || echo "Working...")
+
+        # Escape for JSON
+        LAST_LINE=$(echo "$LAST_LINE" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr -d '\n\r')
+
+        jq --arg activity "$ACTIVITY_TIME" --arg progress "$LAST_LINE" \
+          '.last_activity = $activity | .progress = $progress' \
+          "$STATUS_FILE" > "${STATUS_FILE}.tmp" 2>/dev/null \
+          && mv "${STATUS_FILE}.tmp" "$STATUS_FILE" 2>/dev/null || true
+
+        echo "$LAST_SIZE" > "/tmp/worker-${TASK_ID}-size"
+      else
+        # No activity - check if timed out
+        INACTIVE_SECONDS=$((NOW - LAST_TS))
+        if [ "$INACTIVE_SECONDS" -ge "$TIMEOUT_SECONDS" ]; then
+          echo "TIMEOUT: No activity for ${INACTIVE_SECONDS}s (threshold: ${TIMEOUT_SECONDS}s)"
+
+          # Update status to timeout
+          jq '.status = "timeout" | .progress = "Killed: no activity for 5 minutes"' \
+            "$STATUS_FILE" > "${STATUS_FILE}.tmp" 2>/dev/null \
+            && mv "${STATUS_FILE}.tmp" "$STATUS_FILE" 2>/dev/null || true
+
+          # Kill the Claude process
+          pkill -f "claude -p" 2>/dev/null || true
+          break
+        fi
       fi
     done
   ) &
-  HEARTBEAT_PID=$!
+  MONITOR_PID=$!
 
-  # Run Claude headlessly and capture output
+  # Store last size for monitor
+  echo "0" > "/tmp/worker-${TASK_ID}-size"
+
+  # Run Claude headlessly and stream output to file
   echo "Running Claude with prompt..."
   set +e  # Don't exit on error
-  OUTPUT=$(claude -p "$PROMPT" --dangerously-skip-permissions 2>&1)
-  EXIT_CODE=$?
+  claude -p "$PROMPT" --dangerously-skip-permissions 2>&1 | tee "$OUTPUT_FILE"
+  EXIT_CODE=${PIPESTATUS[0]}
   set -e
 
-  # Stop heartbeat process
-  kill $HEARTBEAT_PID 2>/dev/null || true
+  # Read captured output
+  OUTPUT=$(cat "$OUTPUT_FILE" 2>/dev/null || echo "")
+
+  # Stop monitor process
+  kill $MONITOR_PID 2>/dev/null || true
+
+  # Check if we were killed due to timeout
+  FINAL_STATUS=$(jq -r '.status' "$STATUS_FILE" 2>/dev/null || echo "")
+  if [ "$FINAL_STATUS" = "timeout" ]; then
+    EXIT_CODE=124  # Timeout exit code
+  fi
 
   # Determine status based on exit code
   if [ $EXIT_CODE -eq 0 ]; then
     STATUS="success"
+  elif [ $EXIT_CODE -eq 124 ]; then
+    STATUS="timeout"
   else
     STATUS="error"
   fi
@@ -171,6 +236,11 @@ EOF
 
   # Update status file with completion info
   COMPLETED_AT="$(date -Iseconds)"
+  if [ "$STATUS" = "timeout" ]; then
+    FINAL_PROGRESS="Killed: no activity for 5 minutes"
+  else
+    FINAL_PROGRESS="Completed"
+  fi
   cat > "$STATUS_FILE" << EOF
 {
   "worker_id": "worker-${TASK_ID}",
@@ -178,9 +248,13 @@ EOF
   "status": "$STATUS",
   "started_at": "$STARTED_AT",
   "completed_at": "$COMPLETED_AT",
-  "last_heartbeat": "$COMPLETED_AT"
+  "last_activity": "$COMPLETED_AT",
+  "progress": "$FINAL_PROGRESS"
 }
 EOF
+
+  # Clean up output file
+  rm -f "$OUTPUT_FILE" "/tmp/worker-${TASK_ID}-size"
 
   # Update plan status (if plan exists) with file locking to prevent race conditions
   PLAN_FILE="/orchestration/plan.json"

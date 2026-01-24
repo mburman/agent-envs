@@ -1,7 +1,7 @@
 #!/bin/bash
-# Check health of all workers based on heartbeat timestamps
+# Check status and progress of all workers
 
-STALE_THRESHOLD=${1:-60}  # Seconds before considering a worker stuck (default: 60)
+STALE_THRESHOLD=${1:-300}  # 5 minutes default (matches worker timeout)
 
 STATUS_DIR="/orchestration/status"
 
@@ -10,8 +10,8 @@ if [ ! -d "$STATUS_DIR" ] || [ -z "$(ls -A "$STATUS_DIR" 2>/dev/null)" ]; then
   exit 0
 fi
 
-echo "Worker Status (stale threshold: ${STALE_THRESHOLD}s)"
-echo "=================================================="
+echo "Worker Status"
+echo "============="
 
 NOW=$(date +%s)
 
@@ -21,43 +21,58 @@ for status_file in "$STATUS_DIR"/worker-*.json; do
   TASK_ID=$(jq -r '.task_id' "$status_file")
   STATUS=$(jq -r '.status' "$status_file")
   STARTED=$(jq -r '.started_at // empty' "$status_file")
-  HEARTBEAT=$(jq -r '.last_heartbeat // empty' "$status_file")
-  COMPLETED=$(jq -r '.completed_at // empty' "$status_file")
+  LAST_ACTIVITY=$(jq -r '.last_activity // empty' "$status_file")
+  PROGRESS=$(jq -r '.progress // "No progress info"' "$status_file")
 
-  # Calculate time since last heartbeat
-  if [ -n "$HEARTBEAT" ]; then
-    HEARTBEAT_TS=$(date -d "$HEARTBEAT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${HEARTBEAT%+*}" +%s 2>/dev/null || echo "0")
-    SINCE_HEARTBEAT=$((NOW - HEARTBEAT_TS))
+  # Calculate time since last activity
+  if [ -n "$LAST_ACTIVITY" ]; then
+    ACTIVITY_TS=$(date -d "$LAST_ACTIVITY" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${LAST_ACTIVITY%+*}" +%s 2>/dev/null || echo "$NOW")
+    SINCE_ACTIVITY=$((NOW - ACTIVITY_TS))
   else
-    SINCE_HEARTBEAT=999999
+    SINCE_ACTIVITY=999999
   fi
 
-  # Determine health indicator
+  # Calculate duration
+  if [ -n "$STARTED" ]; then
+    STARTED_TS=$(date -d "$STARTED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${STARTED%+*}" +%s 2>/dev/null || echo "$NOW")
+    DURATION=$((NOW - STARTED_TS))
+    DURATION_STR="${DURATION}s"
+    if [ "$DURATION" -ge 60 ]; then
+      DURATION_STR="$((DURATION / 60))m $((DURATION % 60))s"
+    fi
+  else
+    DURATION_STR="unknown"
+  fi
+
+  # Determine status indicator
   if [ "$STATUS" = "success" ] || [ "$STATUS" = "completed" ]; then
     INDICATOR="✓"
-    HEALTH="completed"
+    STATUS_STR="completed"
   elif [ "$STATUS" = "error" ] || [ "$STATUS" = "failed" ]; then
     INDICATOR="✗"
-    HEALTH="failed"
-  elif [ "$SINCE_HEARTBEAT" -gt "$STALE_THRESHOLD" ]; then
+    STATUS_STR="failed"
+  elif [ "$STATUS" = "timeout" ]; then
+    INDICATOR="⏱"
+    STATUS_STR="timeout (killed)"
+  elif [ "$SINCE_ACTIVITY" -gt "$STALE_THRESHOLD" ]; then
     INDICATOR="⚠"
-    HEALTH="stuck (${SINCE_HEARTBEAT}s since heartbeat)"
+    STATUS_STR="stuck (${SINCE_ACTIVITY}s inactive)"
   else
     INDICATOR="●"
-    HEALTH="alive (${SINCE_HEARTBEAT}s ago)"
+    STATUS_STR="running (${DURATION_STR})"
   fi
 
-  echo "$INDICATOR $TASK_ID: $HEALTH"
+  echo ""
+  echo "$INDICATOR $TASK_ID: $STATUS_STR"
 
-  # Show timing details for running workers
+  # Show progress for non-completed workers
   if [ "$STATUS" = "running" ]; then
-    if [ -n "$STARTED" ]; then
-      STARTED_TS=$(date -d "$STARTED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${STARTED%+*}" +%s 2>/dev/null || echo "0")
-      DURATION=$((NOW - STARTED_TS))
-      echo "  └─ running for ${DURATION}s"
-    fi
+    echo "  ├─ Last activity: ${SINCE_ACTIVITY}s ago"
+    echo "  └─ Progress: $PROGRESS"
   fi
 done
 
 echo ""
-echo "Legend: ✓=completed ●=alive ⚠=stuck ✗=failed"
+echo "Legend: ✓=completed ●=running ⚠=stuck ⏱=timeout ✗=failed"
+echo ""
+echo "Workers auto-kill after 5 minutes of no activity."

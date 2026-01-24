@@ -263,30 +263,47 @@ ls /orchestration/results/
 cat /orchestration/results/task-001.json
 ```
 
-### Worker Heartbeats
+### Worker Progress Reporting
 
-Workers send heartbeat updates every 30 seconds to `/orchestration/status/worker-<task-id>.json`. Use `check-workers.sh` to see:
-- **✓ completed** - Worker finished successfully
-- **● alive** - Worker is running and sending heartbeats
-- **⚠ stuck** - No heartbeat for 60+ seconds (may be hung)
-- **✗ failed** - Worker encountered an error
+Workers report progress every 60 seconds to `/orchestration/status/worker-<task-id>.json`, including:
+- What Claude is currently doing (last output line)
+- Time since last activity
 
-### Killing Stuck Workers
+**Automatic timeout**: Workers are automatically killed after **5 minutes of no activity**.
 
-If workers get stuck (no heartbeat), you can kill them:
-
+Use `check-workers.sh` to see worker status:
 ```bash
-# Check for stuck workers (dry run)
-/opt/orchestrator/lib/kill-stuck-workers.sh
-
-# Kill workers stuck for 2+ minutes (default threshold)
-/opt/orchestrator/lib/kill-stuck-workers.sh 120 kill
-
-# Kill workers stuck for 5+ minutes
-/opt/orchestrator/lib/kill-stuck-workers.sh 300 kill
+/opt/orchestrator/lib/check-workers.sh
 ```
 
-This will stop the container and mark the task as failed in the plan.
+Output:
+```
+● task-001: running (2m 30s)
+  ├─ Last activity: 15s ago
+  └─ Progress: Editing lib/auth/login.dart...
+
+✓ task-002: completed
+⏱ task-003: timeout (killed)
+```
+
+Status indicators:
+- **✓ completed** - Worker finished successfully
+- **● running** - Worker is active and reporting progress
+- **⚠ stuck** - No activity for 5+ minutes (will auto-kill)
+- **⏱ timeout** - Worker was killed due to inactivity
+- **✗ failed** - Worker encountered an error
+
+### Manually Killing Workers
+
+To kill workers before the 5-minute auto-timeout:
+
+```bash
+# Check for inactive workers (dry run)
+/opt/orchestrator/lib/kill-stuck-workers.sh
+
+# Kill workers inactive for 3+ minutes
+/opt/orchestrator/lib/kill-stuck-workers.sh 180 kill
+```
 
 ## Help Requests (Future)
 
