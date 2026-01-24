@@ -50,9 +50,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -h|--help)
       echo "Usage: $0 --repo <git-url> [options]"
+      echo "       $0 --session <name>  (resume existing session)"
       echo ""
       echo "Options:"
-      echo "  --repo URL        Git repo for workers to clone (required)"
+      echo "  --repo URL        Git repo to clone (required for new sessions)"
       echo "  --branch BRANCH   Branch to clone (default: main)"
       echo "  --token FILE      Claude token file (default: ~/.claude-token)"
       echo "  --ssh-key FILE    SSH key for git (default: ~/.ssh/id_ed25519)"
@@ -60,6 +61,11 @@ while [[ $# -gt 0 ]]; do
       echo "  --port PORT       Port for Flutter web server (default: 8080)"
       echo "  --session NAME    Named session (creates new or resumes existing)"
       echo "  --list-sessions   List available sessions to resume"
+      echo ""
+      echo "Examples:"
+      echo "  $0 --repo git@github.com:user/app.git                    # Fresh start (no session)"
+      echo "  $0 --repo git@github.com:user/app.git --session feature  # New named session"
+      echo "  $0 --session feature                                     # Resume session"
       exit 0
       ;;
     *)
@@ -82,10 +88,26 @@ if [ "$LIST_SESSIONS" = true ]; then
   exit 0
 fi
 
-# Validate
-if [ -z "$REPO_URL" ]; then
-  echo "Error: --repo is required"
-  echo "Usage: $0 --repo git@github.com:user/repo.git"
+# Check if session exists (for resuming without --repo)
+SESSION_EXISTS=false
+if [ -n "$SESSION_NAME" ]; then
+  # Check if the session's repo volume exists and has content
+  if docker volume inspect "claude-repo-${SESSION_NAME}" >/dev/null 2>&1; then
+    # Check if volume has a .git directory (repo was cloned)
+    HAS_REPO=$(docker run --rm -v "claude-repo-${SESSION_NAME}:/app" alpine test -d /app/.git && echo "yes" || echo "no")
+    if [ "$HAS_REPO" = "yes" ]; then
+      SESSION_EXISTS=true
+    fi
+  fi
+fi
+
+# Validate - repo is required for new sessions, optional for existing ones
+if [ -z "$REPO_URL" ] && [ "$SESSION_EXISTS" = false ]; then
+  echo "Error: --repo is required for new sessions"
+  echo "Usage: $0 --repo git@github.com:user/repo.git --session <name>"
+  echo ""
+  echo "To resume an existing session: $0 --session <name>"
+  echo "To list sessions: $0 --list-sessions"
   exit 1
 fi
 
@@ -116,6 +138,12 @@ docker volume create orchestration-volume >/dev/null 2>&1 || true
 # Create session volume
 docker volume create claude-sessions >/dev/null 2>&1 || true
 
+# Create per-session repo volume if using sessions
+if [ -n "$SESSION_NAME" ]; then
+  REPO_VOLUME="claude-repo-${SESSION_NAME}"
+  docker volume create "$REPO_VOLUME" >/dev/null 2>&1 || true
+fi
+
 # Build docker args
 DOCKER_ARGS=(
   -it
@@ -134,6 +162,11 @@ DOCKER_ARGS=(
   -v claude-sessions:/home/dev/.claude-sessions
 )
 
+# Mount per-session repo volume if using sessions
+if [ -n "$SESSION_NAME" ]; then
+  DOCKER_ARGS+=(-v "${REPO_VOLUME}:/app")
+fi
+
 [ -f "$SSH_KEY" ] && DOCKER_ARGS+=(-v "$SSH_KEY:/home/dev/.ssh/id_ed25519:ro")
 [ -n "$ANTHROPIC_MODEL" ] && DOCKER_ARGS+=(-e ANTHROPIC_MODEL="$ANTHROPIC_MODEL")
 [ -n "$SESSION_NAME" ] && DOCKER_ARGS+=(-e SESSION_NAME="$SESSION_NAME")
@@ -141,8 +174,10 @@ DOCKER_ARGS=(
 # Remove existing stopped container if present
 docker rm claude-manager 2>/dev/null || true
 
-if [ -n "$SESSION_NAME" ]; then
-  echo "Starting Manager for: $REPO_URL (session: $SESSION_NAME)"
+if [ -n "$SESSION_NAME" ] && [ "$SESSION_EXISTS" = true ]; then
+  echo "Resuming session: $SESSION_NAME"
+elif [ -n "$SESSION_NAME" ]; then
+  echo "Starting new session: $SESSION_NAME (repo: $REPO_URL)"
 else
   echo "Starting Manager for: $REPO_URL"
 fi

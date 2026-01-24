@@ -168,7 +168,7 @@ Tests verify:
 
 ## Session Management
 
-Named sessions persist your Claude conversation across container restarts. This is useful for long-running projects or when you need to stop and resume work.
+Named sessions persist your Claude conversation and repo state across container restarts. This is useful for long-running projects or when you need to stop and resume work.
 
 ```bash
 # Start a new named session
@@ -177,16 +177,19 @@ Named sessions persist your Claude conversation across container restarts. This 
 # List available sessions
 ./run.sh --list-sessions
 
-# Resume an existing session (same command as starting)
-./run.sh --repo git@github.com:user/app.git --session dark-mode-feature
+# Resume an existing session (no --repo needed!)
+./run.sh --session dark-mode-feature
 
 # Inside the container, you can also:
-/opt/orchestrator/lib/list-sessions.sh      # List sessions
+/opt/orchestrator/lib/list-sessions.sh           # List sessions
 /opt/orchestrator/lib/delete-session.sh my-session  # Delete a session
 ```
 
-Sessions are stored in the `claude-sessions` Docker volume. Each session saves:
-- Claude conversation history
-- Session ID for resumption
+Each session persists:
+- Claude conversation history (for `--resume`)
+- Repository state including uncommitted changes (per-session volume)
 
-Note: Orchestration state (plan.json, task files, results) is stored separately in the `orchestration-volume` and persists across all sessions.
+Docker volumes used:
+- `claude-sessions` - Session metadata and Claude state
+- `claude-repo-<session-name>` - Per-session repo state
+- `orchestration-volume` - Shared orchestration state (plan, tasks, results)

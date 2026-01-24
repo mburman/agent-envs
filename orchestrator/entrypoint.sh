@@ -12,8 +12,21 @@ fi
 # Initialize orchestration directories (on shared volume)
 mkdir -p /orchestration/tasks /orchestration/results /orchestration/status /orchestration/help-requests
 
-# Clone repo if REPO_URL is provided
-if [ -n "$REPO_URL" ]; then
+# Check if we're resuming a session with existing repo
+SKIP_CLONE=false
+if [ -n "$SESSION_NAME" ] && [ -d "/app/.git" ]; then
+  echo "Resuming with existing repo..."
+  SKIP_CLONE=true
+  cd /app
+  # Optionally fetch latest if REPO_URL is provided
+  if [ -n "$REPO_URL" ]; then
+    echo "Fetching latest from origin..."
+    git fetch origin "${REPO_BRANCH:-main}" 2>/dev/null || true
+  fi
+fi
+
+# Clone repo if REPO_URL is provided and we're not resuming
+if [ "$SKIP_CLONE" = false ] && [ -n "$REPO_URL" ]; then
   echo "Cloning $REPO_URL (branch: ${REPO_BRANCH:-main})..."
   git clone --branch "${REPO_BRANCH:-main}" --single-branch "$REPO_URL" /app
   cd /app
@@ -28,8 +41,9 @@ if [ -n "$REPO_URL" ]; then
     echo "Installing dependencies for $dir..."
     (cd "$dir" && dart pub get)
   done
-else
-  echo "No REPO_URL provided. Manager will start without a repo context."
+elif [ "$SKIP_CLONE" = false ] && [ -z "$REPO_URL" ]; then
+  echo "No REPO_URL provided and no existing session repo found."
+  echo "Please provide --repo URL or use an existing session."
 fi
 
 # Set up Claude config to skip onboarding and enable bypass permissions mode
