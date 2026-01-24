@@ -40,6 +40,8 @@ git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
 # Install git hooks to block commits/pushes in the worktree
 # Git worktrees share the main .git/hooks by default. We need to use
 # core.hooksPath to point to worktree-specific hooks.
+# IMPORTANT: Use --worktree flag so the config only affects this worktree,
+# not the main repo (which would block the Manager from committing).
 WORKTREE_GIT_DIR=$(git -C "$WORKTREE_DIR" rev-parse --git-dir)
 HOOKS_DIR="${WORKTREE_GIT_DIR}/hooks"
 mkdir -p "$HOOKS_DIR"
@@ -60,8 +62,12 @@ HOOK
 chmod +x "${HOOKS_DIR}/pre-commit"
 chmod +x "${HOOKS_DIR}/pre-push"
 
-# Configure the worktree to use its own hooks directory
-git -C "$WORKTREE_DIR" config core.hooksPath "$HOOKS_DIR"
+# Enable worktree-specific config extension (required for --worktree flag)
+git -C "$WORKTREE_DIR" config extensions.worktreeConfig true
+
+# Configure ONLY this worktree to use its own hooks directory
+# Using --worktree ensures the main repo is not affected
+git -C "$WORKTREE_DIR" config --worktree core.hooksPath "$HOOKS_DIR"
 
 echo "Created worktree: $WORKTREE_DIR (branch: $BRANCH_NAME)"
 echo "Git hooks installed to block commit/push"

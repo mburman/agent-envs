@@ -80,10 +80,21 @@ if [ -n "$SESSION_NAME" ]; then
       cp -r "$SESSION_PATH/.claude/"* ~/.claude/ 2>/dev/null || true
     fi
 
-    # Find the session ID to resume
+    # Find the session ID to resume (must be a valid UUID format)
     RESUME_ID=$(cat "$SESSION_PATH/session-id" 2>/dev/null || echo "")
-    if [ -n "$RESUME_ID" ]; then
-      RESUME_FLAG="--resume $RESUME_ID"
+    # Validate session ID looks like a UUID (8-4-4-4-12 hex pattern)
+    if [[ "$RESUME_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+      # Also verify the session file actually exists
+      if find ~/.claude/projects -name "${RESUME_ID}.jsonl" -type f 2>/dev/null | grep -q .; then
+        RESUME_FLAG="--resume $RESUME_ID"
+        echo "Will resume conversation: $RESUME_ID"
+      else
+        echo "Warning: Session ID found but conversation file missing, starting fresh."
+        rm -f "$SESSION_PATH/session-id"
+      fi
+    elif [ -n "$RESUME_ID" ]; then
+      echo "Warning: Invalid session ID '$RESUME_ID', starting fresh."
+      rm -f "$SESSION_PATH/session-id"
     fi
   else
     echo "Creating new session: $SESSION_NAME"
@@ -101,10 +112,17 @@ save_session() {
     cp -r ~/.claude "$SESSION_PATH/" 2>/dev/null || true
     # Save the most recent session ID for resume
     # Claude stores sessions as .jsonl files in ~/.claude/projects/<path>/<session-id>.jsonl
-    LATEST_SESSION=$(find ~/.claude/projects -name "*.jsonl" -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/\.jsonl$//' || echo "")
-    if [ -n "$LATEST_SESSION" ]; then
-      echo "$LATEST_SESSION" > "$SESSION_PATH/session-id"
-      echo "Session ID: $LATEST_SESSION"
+    SESSION_FILES=$(find ~/.claude/projects -name "*.jsonl" -type f 2>/dev/null || true)
+    if [ -n "$SESSION_FILES" ]; then
+      LATEST_SESSION=$(echo "$SESSION_FILES" | xargs ls -t 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/\.jsonl$//')
+      if [ -n "$LATEST_SESSION" ]; then
+        echo "$LATEST_SESSION" > "$SESSION_PATH/session-id"
+        echo "Session ID: $LATEST_SESSION"
+      fi
+    else
+      echo "No session conversation files found to save."
+      # Remove stale session-id if it exists
+      rm -f "$SESSION_PATH/session-id"
     fi
     echo "Session saved."
   fi

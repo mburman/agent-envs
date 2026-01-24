@@ -62,21 +62,26 @@ else
 
   # Install git hooks
   WORKTREE_GIT_DIR=$(git -C "$WORKTREE_DIR" rev-parse --git-dir)
-  mkdir -p "${WORKTREE_GIT_DIR}/hooks"
+  HOOKS_DIR="${WORKTREE_GIT_DIR}/hooks"
+  mkdir -p "$HOOKS_DIR"
 
-  cat > "${WORKTREE_GIT_DIR}/hooks/pre-commit" << 'HOOK'
+  cat > "${HOOKS_DIR}/pre-commit" << 'HOOK'
 #!/bin/bash
 echo "ERROR: Workers cannot commit."
 exit 1
 HOOK
 
-  cat > "${WORKTREE_GIT_DIR}/hooks/pre-push" << 'HOOK'
+  cat > "${HOOKS_DIR}/pre-push" << 'HOOK'
 #!/bin/bash
 echo "ERROR: Workers cannot push."
 exit 1
 HOOK
 
-  chmod +x "${WORKTREE_GIT_DIR}/hooks/pre-commit" "${WORKTREE_GIT_DIR}/hooks/pre-push"
+  chmod +x "${HOOKS_DIR}/pre-commit" "${HOOKS_DIR}/pre-push"
+
+  # Enable worktree-specific config and set hooksPath for THIS worktree only
+  git -C "$WORKTREE_DIR" config extensions.worktreeConfig true
+  git -C "$WORKTREE_DIR" config --worktree core.hooksPath "$HOOKS_DIR"
 fi
 
 # Update plan status to running (if plan exists)
