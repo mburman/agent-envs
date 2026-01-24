@@ -38,12 +38,8 @@ chmod 600 ~/.claude-token
 cd flutter
 docker build -t claude-flutter .
 
-# Run with your repo
-docker run -it --rm \
-  -e REPO_URL="git@github.com:your-username/your-repo.git" \
-  -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token | tr -d '\n')" \
-  -v ~/.ssh/id_ed25519:/home/dev/.ssh/id_ed25519:ro \
-  claude-flutter
+# Run with your repo (easy way)
+./run.sh --repo git@github.com:your-username/your-repo.git
 ```
 
 ## Adding New Environments

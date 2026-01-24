@@ -18,7 +18,15 @@ Docker environment for running Claude Code with Flutter/Dart projects.
 # Build the image (one-time, takes a while)
 docker build -t claude-flutter .
 
-# Run with your Flutter repo
+# Run with your Flutter repo (easy way)
+./run.sh --repo git@github.com:your-username/your-flutter-repo.git
+
+# Or with custom options
+./run.sh --repo git@github.com:user/repo.git --branch feature/my-branch
+```
+
+**Alternative** (full docker command):
+```bash
 docker run -it --rm \
   -e REPO_URL="git@github.com:your-username/your-flutter-repo.git" \
   -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token | tr -d '\n')" \
@@ -40,6 +48,25 @@ chmod 600 ~/.claude-token
 ```
 
 **Note**: The `tr -d '\n'` in the run command strips newlines from the token, which would otherwise cause HTTP header errors.
+
+## Using the run.sh Script
+
+```bash
+# Basic usage
+./run.sh --repo git@github.com:user/repo.git
+
+# With custom branch
+./run.sh --repo git@github.com:user/repo.git --branch feature/my-branch
+
+# With custom token/SSH key paths
+./run.sh --repo git@github.com:user/repo.git \
+  --token ~/my-token.txt \
+  --ssh-key ~/.ssh/id_rsa
+
+# Or use environment variable
+export REPO_URL="git@github.com:user/repo.git"
+./run.sh
+```
 
 ## Environment Variables
 
