@@ -55,3 +55,105 @@ jobs:
     - name: Test entrypoint validation
       run: |
         docker run --rm claude-flutter 2>&1 | grep -q "REPO_URL environment variable is required" && echo "Entrypoint validation works"
+
+  test-orchestrator:
+    name: Test Orchestrator Environment
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Orchestrator image
+      run: |
+        cd orchestrator
+        docker build -t claude-orchestrator .
+
+    - name: Test Orchestrator tools
+      run: |
+        docker run --rm --entrypoint /bin/bash claude-orchestrator -c "
+          set -e
+          echo 'Testing Flutter installation...'
+          flutter --version
+          echo '---'
+          echo 'Testing Docker CLI installation...'
+          docker --version
+          echo '---'
+          echo 'Testing Claude Code installation...'
+          claude --version
+          echo '---'
+          echo 'Testing jq installation...'
+          jq --version
+          echo '---'
+          echo 'All tools installed!'
+        "
+
+    - name: Test orchestrator scripts exist
+      run: |
+        docker run --rm --entrypoint /bin/bash claude-orchestrator -c "
+          set -e
+          for script in spawn-worker.sh show-plan.sh get-ready-tasks.sh update-task-status.sh list-workers.sh cleanup.sh; do
+            test -x /opt/orchestrator/lib/\$script && echo \"✓ \$script\"
+          done
+          echo 'All scripts present!'
+        "
+
+    - name: Test plan parsing logic
+      run: |
+        docker run --rm --entrypoint /bin/bash claude-orchestrator -c "
+          set -e
+          mkdir -p /orchestration
+          cat > /orchestration/plan.json << 'EOF'
+        {
+          \"goal\": \"Test goal\",
+          \"tasks\": {
+            \"task-001\": {\"name\": \"First\", \"depends_on\": [], \"status\": \"pending\"},
+            \"task-002\": {\"name\": \"Second\", \"depends_on\": [\"task-001\"], \"status\": \"pending\"},
+            \"task-003\": {\"name\": \"Third\", \"depends_on\": [], \"status\": \"completed\"}
+          }
+        }
+        EOF
+          # Test get-ready-tasks finds only task-001
+          READY=\$(/opt/orchestrator/lib/get-ready-tasks.sh)
+          echo \"\$READY\" | grep -q 'task-001' && echo '✓ Found pending task with no deps'
+          ! echo \"\$READY\" | grep -q 'task-002' && echo '✓ Excluded blocked task'
+          ! echo \"\$READY\" | grep -q 'task-003' && echo '✓ Excluded completed task'
+          echo 'Plan parsing works!'
+        "
+
+    - name: Test status update logic
+      run: |
+        docker run --rm --entrypoint /bin/bash claude-orchestrator -c "
+          set -e
+          mkdir -p /orchestration
+          echo '{\"goal\": \"Test\", \"tasks\": {\"task-001\": {\"name\": \"Test\", \"depends_on\": [], \"status\": \"pending\"}}}' > /orchestration/plan.json
+          /opt/orchestrator/lib/update-task-status.sh task-001 running
+          STATUS=\$(cat /orchestration/plan.json | jq -r '.tasks[\"task-001\"].status')
+          [ \"\$STATUS\" = \"running\" ] && echo '✓ Status updated correctly'
+        "
+
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test-flutter, test-orchestrator]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build both images
+      run: |
+        docker build -t claude-orchestrator orchestrator/
+        docker build -t claude-flutter flutter/
+
+    - name: Test sudo docker access
+      run: |
+        docker run --rm \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          claude-orchestrator sudo docker ps && echo "✓ sudo docker works"
