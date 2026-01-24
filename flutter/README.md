@@ -28,16 +28,18 @@ docker run -it --rm \
 
 ## Prerequisites
 
-**Claude Code authentication**: You need a long-lived token from Claude Code.
+**Claude Code authentication**: You need a long-lived OAuth token from Claude Code (requires Claude Pro or Max subscription).
 
 ```bash
 # On your host machine, run:
 claude setup-token
 
-# Save the token to a file:
+# Follow the browser prompt to authenticate, then save the token:
 echo "your-token-here" > ~/.claude-token
 chmod 600 ~/.claude-token
 ```
+
+**Note**: The `tr -d '\n'` in the run command strips newlines from the token, which would otherwise cause HTTP header errors.
 
 ## Environment Variables
 
@@ -107,3 +109,10 @@ docker build --no-cache -t claude-flutter .
 - The image is large (~3-4GB) due to Flutter SDK
 - First build takes a while; subsequent builds use Docker cache
 - Target repo is cloned fresh each run (ephemeral)
+
+## Known Limitations
+
+- **Limited OAuth scopes**: Tokens from `claude setup-token` only have `user:inference` scope
+- **Profile features unavailable**: Commands like `/usage` require `user:profile` scope and will fail with permission errors
+- **macOS credential storage**: Credentials are stored in macOS Keychain (not `~/.claude`), so mounting `~/.claude` won't provide full authentication
+- **Coding features work**: All core features (read, write, edit, bash, grep, etc.) work normally

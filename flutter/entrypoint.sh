@@ -22,5 +22,15 @@ find . -mindepth 2 -name "pubspec.yaml" -type f | while read pubspec; do
   (cd "$dir" && dart pub get)
 done
 
+# Set up Claude config to skip onboarding
+if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+  mkdir -p ~/.claude
+  cat > ~/.claude.json <<'EOF'
+{
+  "hasCompletedOnboarding": true
+}
+EOF
+fi
+
 echo "Starting Claude Code..."
 exec claude --dangerously-skip-permissions "$@"

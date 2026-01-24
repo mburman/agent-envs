@@ -62,19 +62,32 @@ exec claude --dangerously-skip-permissions "$@"
 
 ## Authentication
 
-Claude Code uses a long-lived token passed via `CLAUDE_CODE_OAUTH_TOKEN` environment variable.
+Claude Code uses a long-lived OAuth token passed via `CLAUDE_CODE_OAUTH_TOKEN` environment variable.
+
+### Getting a Token
 
 ```bash
-# Get a token (one-time):
+# Get a token (one-time, requires Claude Pro/Max):
 claude setup-token
 
-# Save to file:
+# Follow browser prompt, then save the token:
 echo "your-token-here" > ~/.claude-token
 chmod 600 ~/.claude-token
+```
 
-# Pass to container:
+### Using the Token
+
+The entrypoint script creates `~/.claude.json` with `hasCompletedOnboarding: true` to skip the login prompt. Pass the token like this:
+
+```bash
 -e CLAUDE_CODE_OAUTH_TOKEN="$(cat ~/.claude-token | tr -d '\n')"
 ```
+
+**Important**: Use `tr -d '\n'` to strip newlines, which cause "invalid header value" errors.
+
+### Limitations
+
+Tokens from `claude setup-token` have limited scopes (`user:inference` only). Features requiring `user:profile` scope (like `/usage`) will fail with permission errors. All coding features work normally.
 
 ## Environment Variables (All Environments)
 

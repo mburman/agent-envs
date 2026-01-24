@@ -18,16 +18,18 @@ Running Claude Code with `--dangerously-skip-permissions` allows it to execute c
 
 ## Prerequisites
 
-**Claude Code authentication**: You need a long-lived token from Claude Code.
+**Claude Code authentication**: You need a long-lived OAuth token from Claude Code (requires Claude Pro or Max subscription).
 
 ```bash
-# On your host machine:
+# On your host machine, run:
 claude setup-token
 
-# Save the token to a file:
+# Follow the browser prompt to authenticate, then save the token:
 echo "your-token-here" > ~/.claude-token
 chmod 600 ~/.claude-token
 ```
+
+**Note**: The token from `claude setup-token` has limited scopes. Features like `/usage` will fail with permission errors, but all coding features (read, write, edit, bash, etc.) work fine.
 
 ## Quick Start
 
