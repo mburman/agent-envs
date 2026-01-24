@@ -9,7 +9,7 @@ REPO_BRANCH="${REPO_BRANCH:-main}"
 ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-}"
 TOKEN_FILE="${HOME}/.claude-token"
 SSH_KEY="${HOME}/.ssh/id_ed25519"
-WEB_PORT="${WEB_PORT:-8080}"
+WEB_PORT="${WEB_PORT:-}"
 SESSION_NAME=""
 LIST_SESSIONS=false
 CLEAN_ALL=false
@@ -63,7 +63,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --token FILE      Claude token file (default: ~/.claude-token)"
       echo "  --ssh-key FILE    SSH key for git (default: ~/.ssh/id_ed25519)"
       echo "  --model MODEL     Model to use (default: claude-opus-4-5-20251101)"
-      echo "  --port PORT       Port for Flutter web server (default: 8080)"
+      echo "  --port PORT       Port for Flutter web server (default: random 8080-8999)"
       echo "  --session NAME    Named session (auto-generated if not provided)"
       echo "  --list-sessions   List available sessions to resume"
       echo "  --clean-all       Reset all state (sessions, repos, orchestration)"
@@ -85,6 +85,11 @@ done
 # Auto-generate session ID if not provided
 if [ -z "$SESSION_NAME" ] && [ "$LIST_SESSIONS" = false ] && [ "$CLEAN_ALL" = false ]; then
   SESSION_NAME="s-$(date +%Y%m%d-%H%M%S)"
+fi
+
+# Auto-generate random port if not provided (range 8080-8999)
+if [ -z "$WEB_PORT" ]; then
+  WEB_PORT=$((8080 + RANDOM % 920))
 fi
 
 # Handle list-sessions command (doesn't require --repo)
@@ -227,8 +232,8 @@ fi
 docker rm "$CONTAINER_NAME" 2>/dev/null || true
 
 if [ "$SESSION_EXISTS" = true ]; then
-  echo "Resuming session: $SESSION_NAME"
+  echo "Resuming session: $SESSION_NAME (port: $WEB_PORT)"
 else
-  echo "Starting new session: $SESSION_NAME (repo: $REPO_URL)"
+  echo "Starting new session: $SESSION_NAME (repo: $REPO_URL, port: $WEB_PORT)"
 fi
 docker run "${DOCKER_ARGS[@]}" claude-orchestrator
