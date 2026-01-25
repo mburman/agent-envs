@@ -66,7 +66,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --port PORT       Port for Flutter web server (default: random 8080-8999)"
       echo "  --session NAME    Named session (auto-generated if not provided)"
       echo "  --list-sessions   List available sessions to resume"
-      echo "  --clean-all       Reset all state (sessions, repos, orchestration)"
+      echo "  --clean-all       Reset all state (sessions, repos)"
       echo ""
       echo "Examples:"
       echo "  $0 --repo git@github.com:user/app.git                    # New auto-named session"
@@ -109,16 +109,12 @@ if [ "$CLEAN_ALL" = true ]; then
   echo "Resetting all state..."
   echo ""
 
-  # Stop and remove all claude containers (manager and session containers)
+  # Stop and remove all claude containers
   CONTAINERS=$(docker ps -aq --filter "name=claude-" 2>/dev/null || true)
   if [ -n "$CONTAINERS" ]; then
     echo "Stopping containers..."
     docker rm -f $CONTAINERS 2>/dev/null || true
   fi
-
-  # Remove orchestration volume
-  echo "Removing orchestration volume..."
-  docker volume rm orchestration-volume 2>/dev/null || true
 
   # Remove sessions volume
   echo "Removing sessions volume..."
@@ -133,7 +129,6 @@ if [ "$CLEAN_ALL" = true ]; then
   echo ""
   echo "Done. All state has been reset:"
   echo "  ✓ Containers removed"
-  echo "  ✓ Orchestration volume removed"
   echo "  ✓ Sessions volume removed"
   echo "  ✓ Repo volumes removed"
   exit 0
@@ -159,13 +154,6 @@ if [ -z "$REPO_URL" ] && [ "$SESSION_EXISTS" = false ]; then
   exit 1
 fi
 
-# Get Docker socket GID for permissions
-DOCKER_GID=$(stat -f '%g' /var/run/docker.sock 2>/dev/null || stat -c '%g' /var/run/docker.sock 2>/dev/null)
-if [ -z "$DOCKER_GID" ]; then
-  echo "Warning: Could not determine Docker socket GID"
-  DOCKER_GID=0
-fi
-
 if [ ! -f "$TOKEN_FILE" ]; then
   echo "Error: Token file not found: $TOKEN_FILE"
   echo "Run 'claude setup-token' and save the token to $TOKEN_FILE"
@@ -180,9 +168,6 @@ fi
 GIT_USER_NAME="${GIT_USER_NAME:-$(git config --global user.name 2>/dev/null || echo "")}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-$(git config --global user.email 2>/dev/null || echo "")}"
 
-# Create orchestration volume
-docker volume create orchestration-volume >/dev/null 2>&1 || true
-
 # Create session volume
 docker volume create claude-sessions >/dev/null 2>&1 || true
 
@@ -193,18 +178,13 @@ if [ -n "$SESSION_NAME" ]; then
 fi
 
 # Container name based on session
-if [ -n "$SESSION_NAME" ]; then
-  CONTAINER_NAME="claude-${SESSION_NAME}"
-else
-  CONTAINER_NAME="claude-manager"
-fi
+CONTAINER_NAME="claude-${SESSION_NAME}"
 
 # Build docker args
 DOCKER_ARGS=(
   -it
   --init
   --name "$CONTAINER_NAME"
-  --group-add "$DOCKER_GID"
   -e TERM="${TERM:-xterm-256color}"
   -p "${WEB_PORT}:${WEB_PORT}"
   -e REPO_URL="$REPO_URL"
@@ -212,10 +192,7 @@ DOCKER_ARGS=(
   -e CLAUDE_CODE_OAUTH_TOKEN="$(cat "$TOKEN_FILE" | tr -d '\n')"
   -e GIT_USER_NAME="$GIT_USER_NAME"
   -e GIT_USER_EMAIL="$GIT_USER_EMAIL"
-  -e HOST_SSH_KEY="$SSH_KEY"
   -e WEB_PORT="$WEB_PORT"
-  -v /var/run/docker.sock:/var/run/docker.sock
-  -v orchestration-volume:/orchestration
   -v claude-sessions:/home/dev/.claude-sessions
 )
 
@@ -236,4 +213,4 @@ if [ "$SESSION_EXISTS" = true ]; then
 else
   echo "Starting new session: $SESSION_NAME (repo: $REPO_URL, port: $WEB_PORT)"
 fi
-docker run "${DOCKER_ARGS[@]}" claude-orchestrator
+docker run "${DOCKER_ARGS[@]}" claude-flutter

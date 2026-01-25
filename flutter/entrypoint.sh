@@ -9,9 +9,6 @@ if [ -n "$GIT_USER_EMAIL" ]; then
   git config --global user.email "$GIT_USER_EMAIL"
 fi
 
-# Initialize orchestration directories (on shared volume)
-mkdir -p /orchestration/tasks /orchestration/results /orchestration/status
-
 # Check if we're resuming a session with existing repo
 SKIP_CLONE=false
 if [ -n "$SESSION_NAME" ] && [ -d "/app/.git" ]; then
@@ -131,14 +128,13 @@ save_session() {
 # Trap EXIT to save session (but only if not using exec)
 trap save_session EXIT
 
-echo "Starting Manager with model: $ANTHROPIC_MODEL..."
-echo "Orchestration volume: /orchestration"
+echo "Starting Claude Code with model: $ANTHROPIC_MODEL..."
 if [ -n "$SESSION_NAME" ]; then
   echo "Session: $SESSION_NAME"
 fi
 echo ""
 
-# Start Claude with the Manager system prompt
+# Start Claude Code
 # The settings.json already sets defaultMode: "bypassPermissions" so we don't need the flag
 # Note: We don't use exec so the trap can run on exit
-claude --append-system-prompt "$(cat /opt/orchestrator/system-prompt.md)" $RESUME_FLAG "$@"
+claude $RESUME_FLAG "$@"

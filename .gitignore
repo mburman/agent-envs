@@ -1,9 +1,3 @@
-# Worktrees (created by workers)
-.worktrees/
-
-# Orchestration state (inside repo when running)
-.orchestration/
-
 # Node modules (if any local testing)
 node_modules/
 

@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies (Flutter + Docker CLI + orchestration tools)
+# Install dependencies (Flutter + dev tools)
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -19,10 +19,8 @@ RUN apt-get update && apt-get install -y \
     liblzma-dev \
     libstdc++-12-dev \
     openssh-client \
-    sudo \
     jq \
     ca-certificates \
-    gnupg \
     ncurses-bin \
     locales \
     && rm -rf /var/lib/apt/lists/*
@@ -31,15 +29,6 @@ RUN apt-get update && apt-get install -y \
 RUN locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
-
-# Install Docker CLI (NOT the daemon - we'll use host's Docker via socket)
-RUN install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-    && chmod a+r /etc/apt/keyrings/docker.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" > /etc/apt/sources.list.d/docker.list \
-    && apt-get update \
-    && apt-get install -y docker-ce-cli \
-    && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
@@ -59,11 +48,10 @@ RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME \
 # Install Claude Code globally
 RUN npm install -g @anthropic-ai/claude-code
 
-# Create non-root user with sudo access for docker (via wrapper)
+# Create non-root user
 RUN useradd -m -s /bin/bash dev \
-    && mkdir -p /app /orchestration \
-    && chown dev:dev /app /orchestration \
-    && echo "dev ALL=(ALL) NOPASSWD: /usr/local/bin/docker, /usr/bin/docker" >> /etc/sudoers.d/dev-docker
+    && mkdir -p /app \
+    && chown dev:dev /app
 
 # Prepare SSH for dev user
 RUN mkdir -p /home/dev/.ssh \
@@ -75,14 +63,10 @@ RUN mkdir -p /home/dev/.ssh \
 RUN mkdir -p /home/dev/.config/claude-code /home/dev/.claude /home/dev/.claude-sessions \
     && chown -R dev:dev /home/dev/.config /home/dev/.claude /home/dev/.claude-sessions
 
-# Copy orchestrator files (build context is repo root)
-COPY orchestrator/entrypoint.sh /entrypoint.sh
-COPY orchestrator/system-prompt.md /opt/orchestrator/system-prompt.md
-COPY orchestrator/lib/ /opt/orchestrator/lib/
-COPY lib/worktree/ /opt/orchestrator/lib/worktree/
-COPY .claude/agents/ /home/dev/.claude/agents/
-RUN chmod +x /entrypoint.sh /opt/orchestrator/lib/*.sh /opt/orchestrator/lib/worktree/*.sh \
-    && chown -R dev:dev /home/dev/.claude/agents
+# Copy entrypoint and session management scripts
+COPY flutter/entrypoint.sh /entrypoint.sh
+COPY flutter/lib/ /opt/flutter-env/lib/
+RUN chmod +x /entrypoint.sh /opt/flutter-env/lib/*.sh
 
 WORKDIR /app
 
