@@ -137,4 +137,4 @@ echo ""
 # Start Claude Code
 # The settings.json already sets defaultMode: "bypassPermissions" so we don't need the flag
 # Note: We don't use exec so the trap can run on exit
-claude $RESUME_FLAG "$@"
+claude $RESUME_FLAG --system-prompt "The Flutter web server is configured to run on port $WEB_PORT. Use this port when running 'flutter run -d web-server --web-port'." "$@"
