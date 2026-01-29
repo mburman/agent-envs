@@ -9,7 +9,15 @@ Docker environment for running Claude Code with Flutter SDK in an isolated conta
 - Dart SDK
 - Node.js 20
 - Claude Code
-- Git, jq, and common dev tools
+- Git, jq, inotify-tools, and common dev tools
+
+## Flutter Web Server (Auto-Start)
+
+When the container starts and a Flutter project is detected (`pubspec.yaml` + `lib/` in `/app`), the Flutter web server automatically starts in the background on the configured port. A file watcher monitors `.dart` files and triggers hot restart on changes.
+
+- **Logs**: `/tmp/flutter-web-server.log`
+- **Restart manually**: `flutter-web-server.sh <port> /app`
+- The port is auto-assigned (8080-8999) or set via `--port`
 
 ## Quick Start
 

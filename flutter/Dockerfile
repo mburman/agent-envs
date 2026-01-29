@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     ncurses-bin \
     locales \
+    inotify-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up UTF-8 locale for proper terminal rendering
@@ -67,6 +68,7 @@ RUN mkdir -p /home/dev/.config/claude-code /home/dev/.claude /home/dev/.claude-s
 COPY flutter/entrypoint.sh /entrypoint.sh
 COPY flutter/lib/ /opt/flutter-env/lib/
 RUN chmod +x /entrypoint.sh /opt/flutter-env/lib/*.sh
+ENV PATH="/opt/flutter-env/lib:$PATH"
 
 WORKDIR /app
 
