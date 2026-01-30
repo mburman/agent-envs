@@ -37,19 +37,20 @@ echo "$FLUTTER_PID" > "$PID_FILE"
 
 echo "[flutter-web-server] Flutter PID: $FLUTTER_PID"
 
-# Wait for the server to be ready (look for "is being served at" in the log)
-echo "[flutter-web-server] Waiting for server to be ready..."
-for i in $(seq 1 120); do
-  if grep -q "is being served at" "$LOG" 2>/dev/null; then
-    echo "[flutter-web-server] Server is ready on port $WEB_PORT"
-    break
-  fi
-  if ! kill -0 "$FLUTTER_PID" 2>/dev/null; then
-    echo "[flutter-web-server] Flutter process died. Check $LOG for details."
-    break
-  fi
-  sleep 1
-done
+# Wait for the server to be ready in the background
+(
+  for i in $(seq 1 120); do
+    if grep -q "is being served at" "$LOG" 2>/dev/null; then
+      echo "[flutter-web-server] Server is ready on port $WEB_PORT"
+      break
+    fi
+    if ! kill -0 "$FLUTTER_PID" 2>/dev/null; then
+      echo "[flutter-web-server] Flutter process died. Check $LOG for details."
+      break
+    fi
+    sleep 1
+  done
+) &
 
 # Start file watcher for hot restart
 (
