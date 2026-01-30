@@ -41,11 +41,11 @@ echo "[flutter-web-server] Flutter PID: $FLUTTER_PID"
 (
   for i in $(seq 1 120); do
     if grep -q "is being served at" "$LOG" 2>/dev/null; then
-      echo "[flutter-web-server] Server is ready on port $WEB_PORT"
+      echo "[flutter-web-server] Server is ready on port $WEB_PORT" >> "$LOG"
       break
     fi
     if ! kill -0 "$FLUTTER_PID" 2>/dev/null; then
-      echo "[flutter-web-server] Flutter process died. Check $LOG for details."
+      echo "[flutter-web-server] Flutter process died. Check $LOG for details." >> "$LOG"
       break
     fi
     sleep 1
