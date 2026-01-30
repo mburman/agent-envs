@@ -67,6 +67,7 @@ RUN mkdir -p /home/dev/.config/claude-code /home/dev/.claude /home/dev/.claude-s
 # Copy entrypoint and session management scripts
 COPY flutter/entrypoint.sh /entrypoint.sh
 COPY flutter/lib/ /opt/flutter-env/lib/
+COPY flutter/commands/ /opt/flutter-env/commands/
 RUN chmod +x /entrypoint.sh /opt/flutter-env/lib/*.sh
 ENV PATH="/opt/flutter-env/lib:$PATH"
 

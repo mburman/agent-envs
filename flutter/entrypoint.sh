@@ -43,6 +43,12 @@ elif [ "$SKIP_CLONE" = false ] && [ -z "$REPO_URL" ]; then
   echo "Please provide --repo URL or use an existing session."
 fi
 
+# Copy custom Claude commands (skills) into the project
+if [ -d /opt/flutter-env/commands ] && [ -d /app ]; then
+  mkdir -p /app/.claude/commands
+  cp /opt/flutter-env/commands/*.md /app/.claude/commands/ 2>/dev/null || true
+fi
+
 # Set up Claude config to skip onboarding and enable bypass permissions mode
 mkdir -p ~/.claude
 cat > ~/.claude.json <<'EOF'
