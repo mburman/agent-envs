@@ -3,6 +3,17 @@ set -e
 
 cd "$(dirname "$0")"
 
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    echo "Usage: ./build.sh [OPTIONS]"
+    echo ""
+    echo "Build the claude-flutter Docker image."
+    echo ""
+    echo "Options:"
+    echo "  --no-cache    Force rebuild without using Docker cache"
+    echo "  --help, -h    Show this help message"
+    exit 0
+fi
+
 DOCKER_ARGS=""
 
 if [[ "$1" == "--no-cache" ]]; then
