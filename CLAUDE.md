@@ -46,5 +46,5 @@ chmod 600 ~/.claude-token
 |----------|---------|
 | `REPO_URL` | Git repo to clone |
 | `REPO_BRANCH` | Branch to clone (default: `main`) |
-| `ANTHROPIC_MODEL` | Model to use (default: `claude-opus-4-5-20251101`) |
+| `ANTHROPIC_MODEL` | Model to use (default: `claude-opus-4-6`) |
 | `SESSION_NAME` | Session name (auto-generated if not provided) |

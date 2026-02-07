@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --branch BRANCH   Branch to clone (default: main)"
       echo "  --token FILE      Claude token file (default: ~/.claude-token)"
       echo "  --ssh-key FILE    SSH key for git (default: ~/.ssh/id_ed25519)"
-      echo "  --model MODEL     Model to use (default: claude-opus-4-5-20251101)"
+      echo "  --model MODEL     Model to use (default: claude-opus-4-6)"
       echo "  --port PORT       Port for Flutter web server (default: random 8080-8999)"
       echo "  --session NAME    Named session (auto-generated if not provided)"
       echo "  --list-sessions   List available sessions to resume"

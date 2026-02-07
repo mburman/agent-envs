@@ -66,7 +66,7 @@ cat > ~/.claude/settings.json <<'EOF'
 EOF
 
 # Set default model to Opus (can be overridden via ANTHROPIC_MODEL env var)
-export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-claude-opus-4-5-20251101}"
+export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-claude-opus-4-6}"
 
 # Session management
 SESSIONS_DIR="/home/dev/.claude-sessions"
