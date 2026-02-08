@@ -107,6 +107,12 @@ fi
 
 # Function to save session on exit
 save_session() {
+  # Stop live-reload proxy
+  if [ -f /tmp/live-reload-proxy.pid ]; then
+    kill "$(cat /tmp/live-reload-proxy.pid)" 2>/dev/null || true
+    rm -f /tmp/live-reload-proxy.pid
+  fi
+
   # Stop Flutter web server and file watcher
   if [ -f /tmp/flutter-web-server.pid ]; then
     FLUTTER_PID=$(cat /tmp/flutter-web-server.pid)

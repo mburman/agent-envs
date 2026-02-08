@@ -5,11 +5,21 @@
 
 WEB_PORT="${1:-${WEB_PORT:-8080}}"
 APP_DIR="${2:-/app}"
+FLUTTER_PORT=$((WEB_PORT + 1))
 PID_FILE="/tmp/flutter-web-server.pid"
+PROXY_PID_FILE="/tmp/live-reload-proxy.pid"
 FIFO="/tmp/flutter-stdin"
 LOG="/tmp/flutter-web-server.log"
 
-echo "[reload] Stopping Flutter web server..."
+echo "[reload] Stopping Flutter web server and live-reload proxy..."
+
+# Kill the live-reload proxy
+if [ -f "$PROXY_PID_FILE" ]; then
+  PROXY_PID=$(cat "$PROXY_PID_FILE" 2>/dev/null)
+  if [ -n "$PROXY_PID" ]; then
+    kill "$PROXY_PID" 2>/dev/null || true
+  fi
+fi
 
 # Kill the process group from the PID file
 if [ -f "$PID_FILE" ]; then
@@ -21,20 +31,21 @@ if [ -f "$PID_FILE" ]; then
   fi
 fi
 
-# Kill any remaining flutter/dart processes on the web port
+# Kill any remaining flutter/dart processes on both ports
 fuser -k "$WEB_PORT/tcp" 2>/dev/null || true
+fuser -k "$FLUTTER_PORT/tcp" 2>/dev/null || true
 
 # Kill any lingering inotifywait file watchers
 pkill -f "inotifywait.*$APP_DIR" 2>/dev/null || true
 
 # Kill any remaining flutter run or dart processes
-pkill -f "flutter run.*web-server.*$WEB_PORT" 2>/dev/null || true
+pkill -f "flutter run.*web-server.*$FLUTTER_PORT" 2>/dev/null || true
 
 # Brief pause to let processes fully terminate
 sleep 1
 
 # Clean up state files
-rm -f "$PID_FILE" "$FIFO" "$LOG"
+rm -f "$PID_FILE" "$PROXY_PID_FILE" "$FIFO" "$LOG"
 
 echo "[reload] Starting Flutter web server on port $WEB_PORT..."
 

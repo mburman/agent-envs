@@ -11,12 +11,37 @@ Docker environment for running Claude Code with Flutter SDK in an isolated conta
 - Claude Code
 - Git, jq, inotify-tools, and common dev tools
 
-## Flutter Web Server (Auto-Start)
+## Live Reload Dev Server
 
-When the container starts and a Flutter project is detected (`pubspec.yaml` + `lib/` in `/app`), the Flutter web server automatically starts in the background on the configured port. A file watcher monitors `.dart` files and triggers hot restart on changes.
+When the container starts and a Flutter project is detected (`pubspec.yaml` + `lib/` in `/app`), a dev server automatically starts with **live reload** — your browser refreshes automatically when code changes.
+
+### Architecture
+
+```
+Browser  -->  Live-reload proxy (:WEB_PORT)  -->  Flutter dev server (:WEB_PORT+1)
+                     |
+                SSE connection
+                     |
+              Auto page reload
+```
+
+A lightweight Node.js proxy sits in front of the Flutter dev server. It injects a small script into the page that listens for reload events via Server-Sent Events (SSE).
+
+### How it works
+
+1. A file watcher (`inotifywait`) monitors all `.dart` files in the project
+2. When changes are detected, it waits for a **5-second quiet period** (no more changes) before acting — this batches rapid edits so you get one recompilation instead of many
+3. Sends `r` to the Flutter process for hot restart (recompilation)
+4. Waits for recompilation to finish
+5. Signals the proxy, which tells all connected browsers to reload via SSE
+
+The quiet period is particularly important when AI agents are making changes to many files in succession — without it, each file save would trigger a separate recompilation.
+
+### Logs and troubleshooting
 
 - **Logs**: `/tmp/flutter-web-server.log`
-- **Restart manually**: `flutter-web-server.sh <port> /app`
+- **Full restart**: `flutter-web-reload.sh` (kills everything and restarts from scratch)
+- **Manual start**: `flutter-web-server.sh <port> /app`
 - The port is auto-assigned (8080-8999) or set via `--port`
 
 ## Quick Start
