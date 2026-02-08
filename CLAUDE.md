@@ -18,8 +18,7 @@ agent-envs/
     ├── README.md
     └── lib/
         ├── list-sessions.sh
-        ├── delete-session.sh
-        └── flutter-web-server.sh
+        └── delete-session.sh
 ```
 
 ## Usage

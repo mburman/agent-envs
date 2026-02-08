@@ -23,7 +23,6 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     ncurses-bin \
     locales \
-    inotify-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up UTF-8 locale for proper terminal rendering

@@ -23,7 +23,7 @@ Docker environments for running [Claude Code](https://github.com/anthropics/clau
 
 ## Available Environments
 
-- **flutter/** - Ubuntu + Flutter SDK + Claude Code, with live-reload dev server (browser auto-refreshes on code changes)
+- **flutter/** - Ubuntu + Flutter SDK + Claude Code
 
 ## Why Docker?
 

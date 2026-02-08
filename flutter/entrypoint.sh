@@ -107,19 +107,6 @@ fi
 
 # Function to save session on exit
 save_session() {
-  # Stop live-reload proxy
-  if [ -f /tmp/live-reload-proxy.pid ]; then
-    kill "$(cat /tmp/live-reload-proxy.pid)" 2>/dev/null || true
-    rm -f /tmp/live-reload-proxy.pid
-  fi
-
-  # Stop Flutter web server and file watcher
-  if [ -f /tmp/flutter-web-server.pid ]; then
-    FLUTTER_PID=$(cat /tmp/flutter-web-server.pid)
-    kill "$FLUTTER_PID" 2>/dev/null || true
-    rm -f /tmp/flutter-web-server.pid /tmp/flutter-stdin
-  fi
-
   if [ -n "$SESSION_NAME" ]; then
     echo ""
     echo "Saving session: $SESSION_NAME..."
@@ -153,14 +140,7 @@ if [ -n "$SESSION_NAME" ]; then
 fi
 echo ""
 
-# Start Flutter web server in the background with hot restart file watching
-if [ -d "/app/lib" ] && [ -f "/app/pubspec.yaml" ]; then
-  echo "Starting Flutter web server in background on port $WEB_PORT..."
-  flutter-web-server.sh "$WEB_PORT" /app
-  echo ""
-fi
-
 # Start Claude Code
 # The settings.json already sets defaultMode: "bypassPermissions" so we don't need the flag
 # Note: We don't use exec so the trap can run on exit
-claude $RESUME_FLAG --system-prompt "The Flutter web app is already running in the background on port $WEB_PORT (http://localhost:$WEB_PORT). It will automatically hot restart when .dart files change. Logs are at /tmp/flutter-web-server.log. If the server dies, you can restart it with: flutter-web-server.sh $WEB_PORT /app" "$@"
+claude $RESUME_FLAG --system-prompt "This is a Flutter development environment. Port $WEB_PORT is exposed for running a Flutter web server. To start one: flutter run -d web-server --web-port $WEB_PORT --web-hostname 0.0.0.0" "$@"
