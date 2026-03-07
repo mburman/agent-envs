@@ -45,8 +45,11 @@ RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME \
     && dart --disable-analytics \
     && chmod -R a+rwx $FLUTTER_HOME
 
-# Install Claude Code globally
-RUN npm install -g @anthropic-ai/claude-code
+# Install Claude Code and Playwright MCP globally
+RUN npm install -g @anthropic-ai/claude-code @playwright/mcp
+
+# Install Playwright browsers and system dependencies
+RUN npx playwright install --with-deps chromium
 
 # Create non-root user
 RUN useradd -m -s /bin/bash dev \

@@ -61,6 +61,12 @@ cat > ~/.claude/settings.json <<'EOF'
 {
   "permissions": {
     "defaultMode": "bypassPermissions"
+  },
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--headless"]
+    }
   }
 }
 EOF
@@ -141,6 +147,5 @@ fi
 echo ""
 
 # Start Claude Code
-# The settings.json already sets defaultMode: "bypassPermissions" so we don't need the flag
 # Note: We don't use exec so the trap can run on exit
-claude $RESUME_FLAG --system-prompt "This is a Flutter development environment. Port $WEB_PORT is exposed for running a Flutter web server. To start one: flutter run -d web-server --web-port $WEB_PORT --web-hostname 0.0.0.0" "$@"
+claude --dangerously-skip-permissions $RESUME_FLAG --system-prompt "This is a Flutter development environment. Port $WEB_PORT is exposed for running a Flutter web server. To start one: flutter run -d web-server --web-port $WEB_PORT --web-hostname 0.0.0.0" "$@"
